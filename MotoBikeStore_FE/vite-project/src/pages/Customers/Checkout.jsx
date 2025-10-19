@@ -1,5 +1,5 @@
 // src/pages/Customers/Checkout.jsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const VND = new Intl.NumberFormat("vi-VN");
 const API_BASE = "http://127.0.0.1:8000/api";
@@ -11,9 +11,51 @@ export default function Checkout({ cart = [], setCart }) {
     email: "",
     address: "",
     note: "",
+    payment_method: "cod", // NEW: cod | momo
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
+
+  // ✅ TỰ ĐIỀN THÔNG TIN KHÁCH HÀNG
+  useEffect(() => {
+    const uStr = localStorage.getItem("user");
+    if (uStr) {
+      const u = JSON.parse(uStr);
+      setForm((f) => ({
+        ...f,
+        customer_name: u.name || f.customer_name,
+        phone: u.phone || u.sdt || f.phone,
+        email: u.email || f.email,
+        address: u.address || f.address,
+      }));
+    }
+    // (tuỳ chọn) gọi /api/me để lấy dữ liệu mới nhất
+    const token = localStorage.getItem("token");
+    if (token) {
+      fetch(`${API_BASE}/me`, {
+        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+      })
+        .then((r) => r.json())
+        .then((d) => {
+          const p = d?.data || d;
+          if (!p) return;
+          setForm((f) => ({
+            ...f,
+            customer_name: p.name ?? f.customer_name,
+            phone: p.phone ?? p.sdt ?? f.phone,
+            email: p.email ?? f.email,
+            address: p.address ?? f.address,
+          }));
+        })
+        .catch(() => {});
+    }
+  }, []);
+
+  // Đồng bộ giỏ -> localStorage (để tab khác/header biết)
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart || []));
+    window.dispatchEvent(new Event("cart:refresh"));
+  }, [cart]);
 
   const total = useMemo(
     () => cart.reduce((s, i) => s + (i.qty || 1) * Number(i.price || 0), 0),
@@ -28,35 +70,24 @@ export default function Checkout({ cart = [], setCart }) {
       return;
     }
 
-    // 🔧 Chuẩn hoá từng item với đầy đủ biến thể tên field
+    // Chuẩn hoá items (đúng y bạn viết)
     const items = cart.map((i) => {
       const q = Number(i.qty || 1);
       const p = Number(i.price || 0);
       return {
-        // ID sản phẩm (cả 2 biến thể)
         id: i.id,
         product_id: i.id,
-
-        // Tên & ảnh (tuỳ chọn)
         name: i.name,
         thumbnail: i.thumbnail_url || null,
-
-        // Số lượng (2 biến thể)
         qty: q,
         quantity: q,
-
-        // Đơn giá (2 biến thể)
         price: p,
         unit_price: p,
-
-        // Thành tiền cho từng dòng
         total: q * p,
       };
     });
 
-    // ✅ Payload “siêu tương thích”: vừa nhóm name..., vừa nhóm customer_...
     const payload = {
-      // nhóm tên thường gặp
       name: form.customer_name,
       phone: form.phone,
       email: form.email || null,
@@ -67,19 +98,20 @@ export default function Checkout({ cart = [], setCart }) {
       items,
       order_details: items,
 
-      // nhóm tên kiểu customer_*
       customer_name: form.customer_name,
       customer_phone: form.phone,
       customer_email: form.email || null,
       customer_address: form.address,
       customer_note: form.note || null,
       customer_total: Math.round(total) || 0,
+
+      payment_method: form.payment_method, // NEW: gửi phương thức thanh toán
     };
 
     try {
       setLoading(true);
-
       const token = localStorage.getItem("token");
+
       const res = await fetch(`${API_BASE}/checkout`, {
         method: "POST",
         headers: {
@@ -90,7 +122,6 @@ export default function Checkout({ cart = [], setCart }) {
         body: JSON.stringify(payload),
       });
 
-      // đọc JSON kể cả khi lỗi để hiện chi tiết 422
       let data = {};
       try { data = await res.json(); } catch {}
 
@@ -99,7 +130,7 @@ export default function Checkout({ cart = [], setCart }) {
         return;
       }
 
-      if (!res.ok) {
+      if (!res.ok || data?.success === false) {
         const details =
           data?.errors
             ? Object.entries(data.errors)
@@ -110,8 +141,18 @@ export default function Checkout({ cart = [], setCart }) {
         throw new Error(apiMsg);
       }
 
+      // NEW: nếu thanh toán online, BE sẽ trả payUrl để chuyển trang
+      if (form.payment_method === "momo" && data?.payUrl) {
+        // không clear giỏ ngay, chờ ipn/return xác nhận
+        window.location.href = data.payUrl;
+        return;
+      }
+
+      // COD
       setMsg("✅ Đặt hàng thành công!");
-      setCart([]); localStorage.removeItem("cart");
+      setCart([]);                // clear state
+      localStorage.removeItem("cart"); // clear localStorage
+      window.dispatchEvent(new Event("cart:refresh")); // 🔔 thông báo cho Cart/Header
     } catch (e) {
       setMsg(`❌ Lỗi: ${e.message || e}`);
     } finally {
@@ -159,13 +200,35 @@ export default function Checkout({ cart = [], setCart }) {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
           />
 
+          {/* NEW: Chọn phương thức thanh toán */}
+          <div className="u-card u-border" style={{ padding: 12 }}>
+            <b>Phương thức thanh toán</b>
+            <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
+              <label>
+                <input
+                  type="radio"
+                  name="pm"
+                  checked={form.payment_method === "cod"}
+                  onChange={() => setForm({ ...form, payment_method: "cod" })}
+                />{" "}
+                Thanh toán khi nhận hàng (COD)
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="pm"
+                  checked={form.payment_method === "momo"}
+                  onChange={() => setForm({ ...form, payment_method: "momo" })}
+                />{" "}
+                Ví MoMo / QR online
+              </label>
+            </div>
+          </div>
+
           {msg && (
             <div
               className="u-card u-border"
-              style={{
-                padding: 10,
-                color: msg.startsWith("✅") ? "#6fe0b1" : "#ff9b9b",
-              }}
+              style={{ padding: 10, color: msg.startsWith("✅") ? "#6fe0b1" : "#ff9b9b" }}
             >
               {msg}
             </div>

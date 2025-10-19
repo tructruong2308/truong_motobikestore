@@ -1,6 +1,6 @@
 // src/pages/Customers/Products.jsx
 import { useEffect, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import ProductCard from "../../components/ProductCard";
 
 const API_ROOT = "http://127.0.0.1:8000";
@@ -16,6 +16,8 @@ const parseMeta = (d) => ({
 });
 
 export default function Products() {
+  const [searchParams, setSearchParams] = useSearchParams();
+
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
@@ -96,9 +98,30 @@ export default function Products() {
     return () => ac.abort();
   }, []);
 
+  // ---------- URL <-> state q ----------
+  // Lấy q từ URL khi vào /products hoặc khi điều hướng từ header
+  useEffect(() => {
+    const kw = searchParams.get("q") || "";
+    setQ(kw);
+  }, [searchParams]);
+
+  // Khi gõ trong ô tìm của trang Products thì cập nhật URL (debounce)
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const cur = searchParams.get("q") || "";
+      if (q !== cur) {
+        const sp = new URLSearchParams(searchParams);
+        if (q) sp.set("q", q);
+        else sp.delete("q");
+        setSearchParams(sp, { replace: true });
+      }
+    }, 250);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [q]);
+
   // ---------- ADD TO CART (fallback + lắng nghe sự kiện từ ProductCard) ----------
   const addToCartLocal = (product) => {
-    // Nếu bạn muốn bắt buộc đăng nhập, giữ đoạn này; nếu không, xoá 3 dòng dưới
     const token = localStorage.getItem("token");
     if (!token) {
       alert("⚠️ Bạn cần đăng nhập trước khi thêm sản phẩm!");
@@ -121,11 +144,8 @@ export default function Products() {
     alert("✅ Đã thêm vào giỏ hàng!");
   };
 
-  // Lắng nghe sự kiện “add-to-cart” do ProductCard bắn ra (nếu nó dùng window.dispatchEvent)
   useEffect(() => {
-    const onAdd = (e) => {
-      if (e?.detail) addToCartLocal(e.detail);
-    };
+    const onAdd = (e) => { if (e?.detail) addToCartLocal(e.detail); };
     window.addEventListener("add-to-cart", onAdd);
     return () => window.removeEventListener("add-to-cart", onAdd);
   }, []);
@@ -181,8 +201,6 @@ export default function Products() {
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <h2 style={{ margin: 0, color: "var(--txt-inv,#eaf5ff)" }}>Tất cả sản phẩm</h2>
-
-          {/* Chip “Tổng” có màu tương phản, luôn nhìn thấy */}
           <span
             className="u-chip"
             style={{
@@ -194,7 +212,6 @@ export default function Products() {
           >
             Tổng: {items.length}
           </span>
-
           {q && (
             <span
               className="u-chip"
@@ -265,7 +282,6 @@ export default function Products() {
                 ...p,
                 image: p.thumbnail_url || p.thumbnail || p.image_url || PLACEHOLDER,
               }}
-              // Nếu ProductCard hỗ trợ prop onAdd, mở comment dưới:
               // onAdd={() => addToCartLocal(p)}
             />
           ))}

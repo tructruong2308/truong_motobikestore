@@ -22,16 +22,18 @@ class Product extends Model
         'detail',
         'description',
         'status',
+        'created_by',
+        'updated_by',
     ];
 
     protected $casts = [
         'price_root' => 'float',
         'price_sale' => 'float',
         'qty'        => 'integer',
-        'status'     => 'integer', // 1=active, 0=inactive
+        'status'     => 'integer',
     ];
 
-    // => FE dùng trực tiếp, không cần xử lý lại
+    // ✅ GIỮ NGUYÊN các appends bạn đang dùng
     protected $appends = [
         'thumbnail_url',
         'brand_name',
@@ -39,9 +41,7 @@ class Product extends Model
         'price_final',
     ];
 
-    /* =========================
-     | Quan hệ
-     * ========================= */
+    /* ========================= Quan hệ ========================= */
     public function brand()
     {
         return $this->belongsTo(Brand::class, 'brand_id');
@@ -52,9 +52,7 @@ class Product extends Model
         return $this->belongsTo(Category::class, 'category_id');
     }
 
-    /* =========================
-     | Accessors (thuộc tính ảo)
-     * ========================= */
+    /* ========================= Accessors ========================= */
     public function getBrandNameAttribute()
     {
         return optional($this->brand)->name;
@@ -67,41 +65,34 @@ class Product extends Model
 
     public function getPriceFinalAttribute()
     {
-        // Giá ưu tiên: price_sale nếu có, ngược lại price_root
-        return $this->price_sale ?: ($this->price_root ?: 0.0);
+        $sale = (float) ($this->price_sale ?? 0);
+        $root = (float) ($this->price_root ?? 0);
+        return $sale > 0 ? $sale : $root;
     }
 
+    // ✅ Accessor ảnh: an toàn, ít I/O, FE onError sẽ tự fallback
     public function getThumbnailUrlAttribute()
     {
-        // Nếu trống -> ảnh mặc định
-        if (!$this->thumbnail) {
-            return asset('assets/images/no-image.png');
-        }
+        $placeholder = asset('assets/images/no-image.png');
 
-        $path = ltrim((string) $this->thumbnail, '/');
+        $raw = trim((string) ($this->thumbnail ?? ''));
+        if ($raw === '') return $placeholder;
 
         // Đã là URL tuyệt đối
-        if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
-            return $path;
+        if (preg_match('~^https?://~i', $raw)) return $raw;
+
+        // Đường dẫn đã prefix sẵn
+        if (str_starts_with($raw, 'storage/')
+            || str_starts_with($raw, 'uploads/')
+            || str_starts_with($raw, 'assets/')) {
+            return asset(ltrim($raw, '/'));
         }
 
-        // Đường dẫn đã nằm trong public/assets/...
-        if (str_starts_with($path, 'assets/')) {
-            return asset($path);
-        }
-
-        // File đã public qua storage:link (public/storage/...)
-        if (str_starts_with($path, 'storage/')) {
-            return asset($path);
-        }
-
-        // Mặc định: trỏ vào public/assets/images/{thumbnail}
-        return asset('assets/images/' . $path);
+        // Mặc định coi như lưu trong disk 'public' (storage/app/public/...)
+        return asset('storage/' . ltrim($raw, '/'));
     }
 
-    /* =========================
-     | Scopes hay dùng
-     * ========================= */
+    /* ========================= Scopes ========================= */
     public function scopeActive($query)
     {
         return $query->where('status', 1);
@@ -112,11 +103,9 @@ class Product extends Model
         return $query->where('qty', '>', 0);
     }
 
-    // Tìm theo tên/slug (không dấu cơ bản & like)
     public function scopeSearch($query, ?string $keyword)
     {
         if (!$keyword) return $query;
-
         $kw = trim($keyword);
         return $query->where(function ($q) use ($kw) {
             $q->where('name', 'like', "%{$kw}%")

@@ -28,14 +28,17 @@ export default function AdminLogin() {
         },
         body: JSON.stringify(form),
       });
+
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) {
         throw new Error(data?.message || "Đăng nhập thất bại");
       }
 
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      navigate("/admin");
+      // 🔑 LƯU ĐÚNG KEY CHO ADMIN
+      localStorage.setItem("admin_token", data.token);
+      localStorage.setItem("admin_user", JSON.stringify(data.user));
+
+      navigate("/admin", { replace: true });
     } catch (err) {
       setError(err.message || "Có lỗi xảy ra, vui lòng thử lại.");
     } finally {
@@ -44,7 +47,7 @@ export default function AdminLogin() {
   };
 
   const canSubmit =
-    form.email.trim().length > 0 && form.password.trim().length > 0 && !loading;
+    form.email.trim() && form.password.trim() && !loading;
 
   return (
     <div
@@ -58,40 +61,18 @@ export default function AdminLogin() {
           "radial-gradient(1000px 600px at 10% -10%, #1f2937 0%, transparent 55%), radial-gradient(1000px 600px at 110% 10%, #0ea5e9 0%, transparent 50%), #0b1320",
       }}
     >
-      <div
-        className="u-card u-border"
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          padding: 18,
-        }}
-      >
-        {/* Header nhỏ */}
+      <div className="u-card u-border" style={{ width: "100%", maxWidth: 460, padding: 18 }}>
+        {/* header */}
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div
-            className="u-chip"
-            style={{
-              background: "rgba(15,23,42,.4)",
-              borderColor: "rgba(148,163,184,.25)",
-            }}
-          >
+          <div className="u-chip" style={{ background: "rgba(15,23,42,.4)", borderColor: "rgba(148,163,184,.25)" }}>
             Cửa hàng xe máy
           </div>
           <div className="u-chip">Hệ thống quản trị</div>
           <div style={{ flex: 1 }} />
-          <div className="u-chip" title="MotoBikeStore" style={{ fontWeight: 800 }}>
-            🏍️
-          </div>
+          <div className="u-chip" title="MotoBikeStore" style={{ fontWeight: 800 }}>🏍️</div>
         </div>
 
-        <h1
-          style={{
-            margin: "12px 0 4px",
-            fontSize: 24,
-            fontWeight: 900,
-            lineHeight: 1.2,
-          }}
-        >
+        <h1 style={{ margin: "12px 0 4px", fontSize: 24, fontWeight: 900, lineHeight: 1.2 }}>
           Đăng nhập quản trị viên
         </h1>
         <p style={{ margin: 0, opacity: 0.8 }}>Nhập email và mật khẩu để tiếp tục.</p>
@@ -104,8 +85,7 @@ export default function AdminLogin() {
               padding: 10,
               borderColor: "rgba(239,68,68,.35)",
               color: "#fecaca",
-              background:
-                "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
+              background: "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
             }}
           >
             {error}
@@ -113,18 +93,8 @@ export default function AdminLogin() {
         )}
 
         <form onSubmit={submit} style={{ marginTop: 14, display: "grid", gap: 12 }}>
-          {/* Ô EMAIL — làm dài hơn ở đây */}
           <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: 6,
-                fontSize: 13,
-                opacity: 0.9,
-              }}
-            >
-              E-mail
-            </label>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}>E-mail</label>
             <input
               type="email"
               name="email"
@@ -135,25 +105,14 @@ export default function AdminLogin() {
               style={{
                 background: "rgba(2,6,23,.5)",
                 borderColor: "rgba(148,163,184,.25)",
-                /* 👇 Kéo dài riêng ô email (ra bên phải) */
                 width: "calc(50% + 160px)",
                 marginRight: "-160px",
               }}
             />
           </div>
 
-          {/* Ô MẬT KHẨU — giữ nguyên */}
           <div>
-            <label
-              style={{
-                display: "block",
-                marginBottom: 6,
-                fontSize: 13,
-                opacity: 0.9,
-              }}
-            >
-              Mật khẩu
-            </label>
+            <label style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}>Mật khẩu</label>
             <div style={{ position: "relative" }}>
               <input
                 type={showPw ? "text" : "password"}
@@ -162,57 +121,28 @@ export default function AdminLogin() {
                 value={form.password}
                 onChange={onChange}
                 className="u-input"
-                style={{
-                  paddingRight: 82,
-                  background: "rgba(2,6,23,.5)",
-                  borderColor: "rgba(148,163,184,.25)",
-                }}
+                style={{ paddingRight: 82, background: "rgba(2,6,23,.5)", borderColor: "rgba(148,163,184,.25)" }}
               />
               <button
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
                 className="u-btn outline"
-                style={{
-                  position: "absolute",
-                  right: 6,
-                  top: 6,
-                  height: 30,
-                  padding: "0 10px",
-                }}
+                style={{ position: "absolute", right: 6, top: 6, height: 30, padding: "0 10px" }}
               >
                 {showPw ? "Ẩn" : "Hiện"}
               </button>
             </div>
           </div>
 
-          <button
-            type="submit"
-            className="u-btn"
-            disabled={!canSubmit}
-            style={{
-              opacity: canSubmit ? 1 : 0.6,
-              cursor: canSubmit ? "pointer" : "not-allowed",
-              marginTop: 4,
-            }}
-          >
+          <button type="submit" className="u-btn" disabled={!canSubmit}
+            style={{ opacity: canSubmit ? 1 : 0.6, cursor: canSubmit ? "pointer" : "not-allowed", marginTop: 4 }}>
             {loading ? "⏳ Đang đăng nhập..." : "🚀 Đăng nhập"}
           </button>
         </form>
 
-        <div
-          style={{
-            marginTop: 14,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            opacity: 0.7,
-            fontSize: 12,
-          }}
-        >
+        <div style={{ marginTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", opacity: 0.7, fontSize: 12 }}>
           <span>© {new Date().getFullYear()} MotoBikeStore – Admin</span>
-          <a href="/" className="u-chip" style={{ textDecoration: "none" }}>
-            ← Về trang chủ
-          </a>
+          <a href="/" className="u-chip" style={{ textDecoration: "none" }}>← Về trang chủ</a>
         </div>
       </div>
     </div>

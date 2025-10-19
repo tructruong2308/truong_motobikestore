@@ -63,4 +63,7 @@ class Order extends Model
         }
         return (float) $this->details()->sum('amount');
     }
+
+    public function payments() { return $this->hasMany(\App\Models\Payment::class); }
 }
+

@@ -25,12 +25,28 @@ export default function Orders() {
   const [sel, setSel] = useState(null);
   const [pendingId, setPendingId] = useState(null);
 
-  const token = localStorage.getItem("token");
-  const authHeaders = () => ({
-    "Content-Type": "application/json",
-    Accept: "application/json",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  });
+  // ---- Auth helpers (ADMIN) ----
+  const getAdminToken = () => {
+    try {
+      return localStorage.getItem("admin_token") || "";
+    } catch {
+      return "";
+    }
+  };
+  const handle401 = () => {
+    try {
+      localStorage.removeItem("admin_token");
+      localStorage.removeItem("admin_user");
+    } catch {}
+    window.location.href = "/admin/login";
+  };
+  const authHeaders = (withJson = true) => {
+    const token = getAdminToken();
+    const base = { Accept: "application/json" };
+    if (withJson) base["Content-Type"] = "application/json";
+    if (token) base.Authorization = `Bearer ${token}`;
+    return base;
+  };
 
   // ===== STYLE: đẹp, gọn, bám dark theme =====
   const styles = `
@@ -39,37 +55,39 @@ export default function Orders() {
   }
   .admin-orders .kpi{
     display:flex; align-items:center; gap:12px; padding:12px 14px;
-    border:1px solid rgba(148,163,184,.18); border-radius:14px;
-    background:linear-gradient(180deg, rgba(17,24,39,.7), rgba(2,6,23,.7));
+    border:1px solid rgba(100,116,139,.22); border-radius:14px;
+    background:linear-gradient(180deg, #0b0e14, #0a0f1e);
   }
   .admin-orders .kpi i{
     width:40px; height:40px; display:grid; place-items:center; font-size:18px;
-    border-radius:10px; background:rgba(59,130,246,.15); color:#93c5fd;
+    border-radius:10px; background:rgba(100,116,139,.20); color:#cbd5e1;
   }
   .admin-orders .kpi h4{ margin:0; font-size:13px; opacity:.8 }
   .admin-orders .kpi b{ font-size:18px }
 
   .admin-orders .table-wrap{
-    border:1px solid rgba(148,163,184,.18);
-    border-radius:14px; overflow:hidden; background:rgba(15,23,42,.55);
+    border:1px solid rgba(100,116,139,.22);
+    border-radius:14px; overflow:hidden; background:#0e1320;
   }
   .admin-orders table{ width:100%; border-collapse:separate; border-spacing:0 }
   .admin-orders thead th{
     position:sticky; top:0; z-index:1;
-    background:rgba(2,6,23,.9);
-    border-bottom:1px solid rgba(148,163,184,.18);
+    background:#0b0f1a;
+    border-bottom:1px solid rgba(100,116,139,.22);
     padding:12px; text-align:left; font-weight:700;
+    color:#e5e7eb;
   }
   .admin-orders tbody td{
-    padding:12px 14px; border-bottom:1px solid rgba(148,163,184,.08);
+    padding:12px 14px; border-bottom:1px solid rgba(100,116,139,.14);
+    color:#e5e7eb;
   }
-  .admin-orders tbody tr:hover{ background:rgba(59,130,246,.06) }
-  .admin-orders tbody tr:nth-child(even){ background:rgba(148,163,184,.04) }
+  .admin-orders tbody tr:hover{ background:rgba(148,163,184,.08) }
+  .admin-orders tbody tr:nth-child(even){ background:rgba(148,163,184,.05) }
 
   .admin-orders .status-select{
     height:34px; border-radius:10px;
-    background:rgba(2,6,23,.55); color:#e5e7eb;
-    border:1px solid rgba(148,163,184,.25); padding:0 10px;
+    background:#0b1220; color:#e5e7eb;
+    border:1px solid rgba(100,116,139,.35); padding:0 10px;
   }
   .admin-orders .actions{ display:flex; gap:8px; align-items:center }
   .admin-orders .btn-sm{ height:34px; padding:0 12px; border-radius:10px }
@@ -79,8 +97,8 @@ export default function Orders() {
   }
   .admin-orders .chip{
     padding:6px 10px; border-radius:999px;
-    border:1px solid rgba(148,163,184,.25);
-    background:rgba(2,6,23,.45); color:#cbd5e1; cursor:pointer;
+    border:1px solid rgba(100,116,139,.35);
+    background:#0b1220; color:#cbd5e1; cursor:pointer;
   }
   .admin-orders .chip.active{ 
     background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.45); color:#bbf7d0;
@@ -110,13 +128,9 @@ export default function Orders() {
     try {
       setLoading(true);
       setErr("");
-      const res = await fetch(`${API_BASE}/orders`, { headers: authHeaders() });
+      const res = await fetch(`${API_BASE}/orders`, { headers: authHeaders(false) });
 
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/admin/login";
-        return;
-      }
+      if (res.status === 401) { handle401(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const data = await res.json().catch(() => ({}));
@@ -128,7 +142,7 @@ export default function Orders() {
         [];
       setItems(list.map(normalizeOrder));
     } catch (e) {
-      setErr(String(e));
+      setErr(String(e?.message || e));
       setItems([]);
     } finally {
       setLoading(false);
@@ -175,14 +189,10 @@ export default function Orders() {
   const openDetail = async (o) => {
     setSel({ ...o, _loading: true });
     try {
-      const res = await fetch(`${API_BASE}/orders/${o.id}`, { headers: authHeaders() });
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/admin/login";
-        return;
-      }
+      const res = await fetch(`${API_BASE}/orders/${o.id}`, { headers: authHeaders(false) });
+      if (res.status === 401) { handle401(); return; }
       if (res.ok) {
-        const d = await res.json();
+        const d = await res.json().catch(() => ({}));
         const items = d?.items || d?.order_details || d?.details || [];
         setSel({ ...normalizeOrder(d.id ? d : o), items, _loading: false });
       } else {
@@ -198,14 +208,10 @@ export default function Orders() {
       setPendingId(orderId);
       const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
         method: "PATCH",
-        headers: authHeaders(),
+        headers: authHeaders(true),
         body: JSON.stringify({ status: Number(nextStatus) }),
       });
-      if (res.status === 401) {
-        localStorage.removeItem("token");
-        window.location.href = "/admin/login";
-        return;
-      }
+      if (res.status === 401) { handle401(); return; }
       if (!res.ok) {
         const msg = await res.text().catch(() => "");
         throw new Error(`HTTP ${res.status} ${msg}`);

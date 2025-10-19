@@ -6,6 +6,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Str;
 
 class User extends Authenticatable
 {
@@ -29,4 +30,19 @@ class User extends Authenticatable
     ];
 
     protected $hidden = ['password', 'remember_token'];
+
+    // luôn append avatar_url khi toArray()/toJson()
+    protected $appends = ['avatar_url'];
+
+    public function getAvatarUrlAttribute()
+    {
+        if (!$this->avatar) return null;
+
+        // Nếu đã là URL tuyệt đối thì trả luôn
+        if (Str::startsWith($this->avatar, ['http://','https://','/storage'])) {
+            return $this->avatar;
+        }
+        // Ngược lại ghép vào public disk
+        return asset('storage/'.$this->avatar);
+    }
 }

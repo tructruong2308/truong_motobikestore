@@ -5,179 +5,224 @@ import { useLocation, useNavigate, Link } from "react-router-dom";
 const API_BASE = "http://127.0.0.1:8000";
 
 export default function Login() {
-  const [form, setForm] = useState({ email: "", password: "" });
-  const [message, setMessage] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from || "/"; // nơi cần quay lại sau login
+  const from = location.state?.from || "/";
 
-  const handleChange = (e) =>
+  const [form, setForm] = useState({ email: "", password: "" });
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const onChange = (e) =>
     setForm((s) => ({ ...s, [e.target.name]: e.target.value }));
 
-  const handleSubmit = async (e) => {
+  const submit = async (e) => {
     e.preventDefault();
-    setMessage("");
+    setMsg("");
     setLoading(true);
+
     try {
       const res = await fetch(`${API_BASE}/api/login`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Accept: "application/json",
+          "Content-Type": "application/json",
         },
         body: JSON.stringify(form),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        setMessage("❌ " + (data.message || "Đăng nhập thất bại"));
-        console.error("Login error:", data);
-      } else {
-        // Lưu user & token
-        localStorage.setItem("user", JSON.stringify(data.user));
-        localStorage.setItem("token", data.token);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data?.success === false) {
+        throw new Error(data?.message || "Đăng nhập thất bại");
+      }
 
-        setMessage("✅ Đăng nhập thành công!");
-        // Nếu Header đang đọc user từ localStorage, reload để cập nhật menu
-        setTimeout(() => {
-          navigate(from, { replace: true });
-          window.location.reload();
-        }, 600);
+      // ✅ Lưu cả key mới (customer_*) và key legacy (token/user) để tương thích
+      localStorage.setItem("customer_token", data.token);
+      localStorage.setItem("customer_user", JSON.stringify(data.user));
+      localStorage.setItem("token", data.token);              // legacy cho các trang đang dùng
+      localStorage.setItem("user", JSON.stringify(data.user)); // legacy cho các trang đang dùng
+
+      // Cho header/cart sync biết
+      window.dispatchEvent(new Event("user:refresh"));
+
+      setMsg("✅ Đăng nhập thành công!");
+
+      // Ưu tiên quay về nơi đã chặn khi thêm giỏ hàng
+      const back = localStorage.getItem("post_login_redirect");
+      if (back) {
+        localStorage.removeItem("post_login_redirect");
+        navigate(back, { replace: true });
+      } else {
+        navigate(from, { replace: true });
       }
     } catch (err) {
-      setMessage("❌ Lỗi kết nối: " + err.message);
-      console.error(err);
+      setMsg("❌ " + (err.message || "Có lỗi xảy ra, vui lòng thử lại."));
     } finally {
       setLoading(false);
     }
   };
 
+  const canSubmit =
+    form.email.trim().length > 0 &&
+    form.password.trim().length > 0 &&
+    !loading;
+
   return (
     <div
+      className="page-wrap"
       style={{
         minHeight: "100vh",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        background: "linear-gradient(135deg, #dbeafe, #ede9fe)",
+        display: "grid",
+        placeItems: "center",
         padding: 16,
+        background:
+          "radial-gradient(1000px 600px at 10% -10%, #1f2937 0%, transparent 55%), radial-gradient(1000px 600px at 110% 10%, #0ea5e9 0%, transparent 50%), #0b1320",
       }}
     >
       <div
-        style={{
-          background: "#fff",
-          padding: "2rem",
-          borderRadius: 12,
-          boxShadow: "0 6px 20px rgba(0,0,0,0.08)",
-          width: "100%",
-          maxWidth: 420,
-        }}
+        className="u-card u-border"
+        style={{ width: "100%", maxWidth: 440, padding: 18 }}
       >
-        <h2
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div
+            className="u-chip"
+            style={{
+              background: "rgba(15,23,42,.4)",
+              borderColor: "rgba(148,163,184,.25)",
+            }}
+          >
+            MotoBikeStore
+          </div>
+          <div className="u-chip">Khu vực khách hàng</div>
+          <div style={{ flex: 1 }} />
+          <div className="u-chip" title="MotoBikeStore" style={{ fontWeight: 800 }}>
+            🏍️
+          </div>
+        </div>
+
+        <h1
           style={{
-            textAlign: "center",
-            marginBottom: 18,
-            color: "#1d4ed8",
-            fontWeight: 700,
+            margin: "12px 0 4px",
+            fontSize: 24,
+            fontWeight: 900,
+            lineHeight: 1.2,
           }}
         >
           Đăng nhập
-        </h2>
+        </h1>
+        <p style={{ margin: 0, opacity: 0.85 }}>
+          Nhập email và mật khẩu để tiếp tục mua sắm.
+        </p>
 
-        {message && (
-          <p
+        {msg && (
+          <div
+            className="u-card u-border"
             style={{
-              textAlign: "center",
-              marginBottom: 12,
-              color: message.startsWith("✅") ? "#16a34a" : "#dc2626",
-              fontWeight: 600,
+              marginTop: 12,
+              padding: 10,
+              borderColor: msg.startsWith("✅")
+                ? "rgba(16,185,129,.35)"
+                : "rgba(239,68,68,.35)",
+              color: msg.startsWith("✅") ? "#6fe0b1" : "#fecaca",
+              background: msg.startsWith("✅")
+                ? "linear-gradient(180deg, rgba(6,78,59,.25), rgba(6,95,70,.2))"
+                : "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
             }}
           >
-            {message}
-          </p>
+            {msg}
+          </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <label style={{ display: "block", marginBottom: 6 }}>Email</label>
-          <input
-            type="email"
-            name="email"
-            placeholder="you@email.com"
-            value={form.email}
-            onChange={handleChange}
-            required
-            autoFocus
-            style={{
-              width: "100%",
-              padding: "12px",
-              marginBottom: "14px",
-              border: "1px solid #d1d5db",
-              borderRadius: "8px",
-            }}
-          />
-
-          <label style={{ display: "block", marginBottom: 6 }}>Mật khẩu</label>
-          <div style={{ position: "relative", marginBottom: 16 }}>
-            <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              placeholder="••••••••"
-              value={form.password}
-              onChange={handleChange}
-              required
-              style={{
-                width: "100%",
-                padding: "12px",
-                border: "1px solid #d1d5db",
-                borderRadius: "8px",
-              }}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword((s) => !s)}
-              style={{
-                position: "absolute",
-                right: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                background: "transparent",
-                border: 0,
-                cursor: "pointer",
-                fontSize: 18,
-              }}
-              aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+        <form onSubmit={submit} style={{ marginTop: 14, display: "grid", gap: 12 }}>
+          <div>
+            <label
+              style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}
             >
-              {showPassword ? "🙈" : "👁️"}
-            </button>
+              E-mail
+            </label>
+            <input
+              type="email"
+              name="email"
+              placeholder="you@email.com"
+              value={form.email}
+              onChange={onChange}
+              className="u-input"
+              style={{
+                background: "rgba(2,6,23,.5)",
+                borderColor: "rgba(148,163,184,.25)",
+              }}
+              autoFocus
+              required
+            />
+          </div>
+
+          <div>
+            <label
+              style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}
+            >
+              Mật khẩu
+            </label>
+            <div style={{ position: "relative" }}>
+              <input
+                type={showPw ? "text" : "password"}
+                name="password"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={onChange}
+                className="u-input"
+                style={{
+                  paddingRight: 82,
+                  background: "rgba(2,6,23,.5)",
+                  borderColor: "rgba(148,163,184,.25)",
+                }}
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPw((v) => !v)}
+                className="u-btn outline"
+                style={{ position: "absolute", right: 6, top: 6, height: 30, padding: "0 10px" }}
+                aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+              >
+                {showPw ? "Ẩn" : "Hiện"}
+              </button>
+            </div>
           </div>
 
           <button
             type="submit"
-            disabled={loading}
+            className="u-btn"
+            disabled={!canSubmit}
             style={{
-              width: "100%",
-              background:
-                "linear-gradient(90deg, rgba(37,99,235,1) 0%, rgba(29,78,216,1) 100%)",
-              color: "#fff",
-              padding: "12px",
-              border: "none",
-              borderRadius: "8px",
-              fontWeight: "bold",
-              cursor: loading ? "not-allowed" : "pointer",
+              opacity: canSubmit ? 1 : 0.6,
+              cursor: canSubmit ? "pointer" : "not-allowed",
+              marginTop: 4,
             }}
           >
-            {loading ? "⏳ Đang đăng nhập..." : "Đăng nhập"}
+            {loading ? "⏳ Đang đăng nhập..." : "🔓 Đăng nhập"}
           </button>
         </form>
 
-        <div style={{ marginTop: 12, textAlign: "center", fontSize: 14 }}>
-          Chưa có tài khoản?{" "}
-          <Link to="/register" style={{ color: "#1d4ed8" }}>
-            Đăng ký
-          </Link>
+        <div
+          style={{
+            marginTop: 14,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            opacity: 0.8,
+            fontSize: 13,
+          }}
+        >
+          <span>
+            Chưa có tài khoản?{" "}
+            <Link className="u-chip" to="/register" style={{ textDecoration: "none" }}>
+              Đăng ký
+            </Link>
+          </span>
+          <a href="/" className="u-chip" style={{ textDecoration: "none" }}>
+            ← Về trang chủ
+          </a>
         </div>
       </div>
     </div>

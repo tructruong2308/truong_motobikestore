@@ -1,11 +1,17 @@
 // src/pages/Customers/Home.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import ProductCard from "../../components/ProductCard";
 
 const API_BASE = "http://127.0.0.1:8000";
-const CAT_PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
+const API_CATEGORIES = `${API_BASE}/api/categories`;
+const API_PRODUCTS = `${API_BASE}/api/products`;
 
-// Ghép URL ảnh danh mục: ưu tiên /assets/images, hỗ trợ /images, tên file trần, URL tuyệt đối
+const CAT_PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
+const PROD_PLACEHOLDER = "https://placehold.co/300x200?text=No+Image";
+
+const SHOW_COUNT = 4; // đổi 4/5/8 tuỳ ý
+
+// Ghép URL ảnh danh mục
 const buildCatImg = (raw) => {
   if (!raw) return CAT_PLACEHOLDER;
   const s = String(raw).trim();
@@ -17,7 +23,7 @@ const buildCatImg = (raw) => {
   if (s.startsWith("/assets/images/")) return `${API_BASE}${s}`;
   if (s.startsWith("assets/images/"))  return `${API_BASE}/${s}`;
 
-  // Hỗ trợ trường hợp BE trả /images
+  // Hỗ trợ /images
   if (s.startsWith("/images/")) return `${API_BASE}${s}`;
   if (s.startsWith("images/"))  return `${API_BASE}/${s}`;
 
@@ -26,6 +32,19 @@ const buildCatImg = (raw) => {
   const name = hasExt ? s : `${s}.webp`;
   return `${API_BASE}/assets/images/${name}`;
 };
+
+// Kiểm tra đúng nghĩa "giảm giá"
+const isSale = (p) => {
+  const root = Number(p?.price_root ?? 0);
+  const price = Number(p?.price ?? p?.price_sale ?? 0);
+  return root > 0 && price > 0 && price < root;
+};
+
+// Chuẩn hoá dữ liệu cho ProductCard (ảnh, giá…)
+const normalizeProduct = (p) => ({
+  ...p,
+  image: p?.thumbnail_url || p?.thumbnail || p?.image_url || PROD_PLACEHOLDER,
+});
 
 export default function Home() {
   const [categories, setCategories] = useState([]);
@@ -42,21 +61,41 @@ export default function Home() {
         setLoading(true);
         setErr("");
 
+        // ✅ gọi đúng /api + tham số đúng, thêm _ts chống cache
+        const qsNew  = new URLSearchParams({ limit: String(SHOW_COUNT), _ts: Date.now().toString() });
+        const qsSale = new URLSearchParams({ limit: String(SHOW_COUNT), only_sale: "1", _ts: Date.now().toString() });
+
         const [resCats, resNew, resSale] = await Promise.all([
-          fetch(`${API_BASE}/categories`, { signal: ac.signal }),
-          fetch(`${API_BASE}/products?sort=created_at:desc&limit=8`, { signal: ac.signal }),
-          fetch(`${API_BASE}/products?where=has_sale&limit=8`, { signal: ac.signal }),
+          fetch(API_CATEGORIES, { signal: ac.signal, headers: { Accept: "application/json" }, cache: "no-store" }),
+          fetch(`${API_PRODUCTS}?${qsNew.toString()}`, { signal: ac.signal, headers: { Accept: "application/json" }, cache: "no-store" }),
+          fetch(`${API_PRODUCTS}?${qsSale.toString()}`, { signal: ac.signal, headers: { Accept: "application/json" }, cache: "no-store" }),
         ]);
 
-        const cats = await resCats.json().catch(() => ([]));
-        const n = await resNew.json().catch(() => ([]));
-        const s = await resSale.json().catch(() => ([]));
+        if (!resCats.ok) throw new Error(`Cats HTTP ${resCats.status}`);
+        if (!resNew.ok) throw new Error(`New HTTP ${resNew.status}`);
+        if (!resSale.ok) throw new Error(`Sale HTTP ${resSale.status}`);
 
-        setCategories(Array.isArray(cats) ? cats : (cats?.data || []));
-        setNewItems(Array.isArray(n) ? n : (n?.data || []));
-        setSaleItems(Array.isArray(s) ? s : (s?.data || []));
+        const catsData = await resCats.json().catch(() => ([]));
+        const newData  = await resNew.json().catch(() => ([]));
+        const saleData = await resSale.json().catch(() => ([]));
+
+        // Chuẩn hoá danh sách trả về (BE có thể trả mảng hoặc {data:[]})
+        const cats = Array.isArray(catsData) ? catsData : (catsData?.data || []);
+        let latest = Array.isArray(newData) ? newData : (newData?.data || []);
+        let sales  = Array.isArray(saleData) ? saleData : (saleData?.data || []);
+
+        // Bảo hiểm: hàng sale lọc lại ở FE để chắc chắn
+        sales = sales.filter(isSale);
+
+        // Sort mới nhất theo id ↓, cắt đúng số lượng (BE đã latest nhưng ta sort lại cho chắc)
+        latest = [...latest].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0)).slice(0, SHOW_COUNT);
+        sales  = [...sales].sort((a, b) => Number(b?.id || 0) - Number(a?.id || 0)).slice(0, SHOW_COUNT);
+
+        setCategories(cats);
+        setNewItems(latest);
+        setSaleItems(sales);
       } catch (e) {
-        if (e.name !== "AbortError") setErr(String(e));
+        if (e.name !== "AbortError") setErr(e.message || "Không tải dữ liệu.");
       } finally {
         setLoading(false);
       }
@@ -64,6 +103,10 @@ export default function Home() {
 
     return () => ac.abort();
   }, []);
+
+  // Chuẩn hoá item cho ProductCard
+  const latestView = useMemo(() => newItems.map(normalizeProduct), [newItems]);
+  const salesView  = useMemo(() => saleItems.map(normalizeProduct), [saleItems]);
 
   const onCatImgError = (e) => {
     // Thử chuyển .webp -> .jpg 1 lần trước khi dùng placeholder
@@ -161,10 +204,10 @@ export default function Home() {
           }}
         >
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: SHOW_COUNT }).map((_, i) => (
                 <div key={i} className="skeleton" style={{ height: 260, borderRadius: 16 }} />
               ))
-            : newItems.map((p) => <ProductCard key={p.id} p={p} />)}
+            : latestView.map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
       </section>
 
@@ -179,10 +222,10 @@ export default function Home() {
           }}
         >
           {loading
-            ? Array.from({ length: 8 }).map((_, i) => (
+            ? Array.from({ length: SHOW_COUNT }).map((_, i) => (
                 <div key={i} className="skeleton" style={{ height: 260, borderRadius: 16 }} />
               ))
-            : saleItems.map((p) => <ProductCard key={p.id} p={p} />)}
+            : salesView.map((p) => <ProductCard key={p.id} p={p} />)}
         </div>
       </section>
     </div>
