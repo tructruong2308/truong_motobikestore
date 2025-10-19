@@ -11,14 +11,15 @@ export default function Checkout({ cart = [], setCart }) {
     email: "",
     address: "",
     note: "",
-    payment_method: "cod", // NEW: cod | momo
+    payment_method: "cod", // cod | momo
   });
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  // ✅ TỰ ĐIỀN THÔNG TIN KHÁCH HÀNG
+  // Tự điền thông tin khách
   useEffect(() => {
-    const uStr = localStorage.getItem("user");
+    const uStr =
+      localStorage.getItem("customer_user") || localStorage.getItem("user");
     if (uStr) {
       const u = JSON.parse(uStr);
       setForm((f) => ({
@@ -29,11 +30,14 @@ export default function Checkout({ cart = [], setCart }) {
         address: u.address || f.address,
       }));
     }
-    // (tuỳ chọn) gọi /api/me để lấy dữ liệu mới nhất
-    const token = localStorage.getItem("token");
+    const token =
+      localStorage.getItem("customer_token") || localStorage.getItem("token");
     if (token) {
       fetch(`${API_BASE}/me`, {
-        headers: { Accept: "application/json", Authorization: `Bearer ${token}` },
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
       })
         .then((r) => r.json())
         .then((d) => {
@@ -51,7 +55,7 @@ export default function Checkout({ cart = [], setCart }) {
     }
   }, []);
 
-  // Đồng bộ giỏ -> localStorage (để tab khác/header biết)
+  // Sync giỏ
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart || []));
     window.dispatchEvent(new Event("cart:refresh"));
@@ -62,6 +66,13 @@ export default function Checkout({ cart = [], setCart }) {
     [cart]
   );
 
+  // Giới hạn sandbox MoMo
+  const momoDisabled = total < 1000 || total > 50_000_000;
+  const momoReason =
+    total > 50_000_000
+      ? "MoMo sandbox chỉ cho phép tối đa 50.000.000đ/giao dịch. Hãy giảm số lượng hoặc chọn COD."
+      : "Số tiền MoMo phải từ 1.000đ.";
+
   const submit = async () => {
     setMsg("");
 
@@ -70,7 +81,7 @@ export default function Checkout({ cart = [], setCart }) {
       return;
     }
 
-    // Chuẩn hoá items (đúng y bạn viết)
+    // Chuẩn hoá items
     const items = cart.map((i) => {
       const q = Number(i.qty || 1);
       const p = Number(i.price || 0);
@@ -94,7 +105,6 @@ export default function Checkout({ cart = [], setCart }) {
       address: form.address,
       note: form.note || null,
       total: Math.round(total) || 0,
-      status: 1,
       items,
       order_details: items,
 
@@ -105,12 +115,20 @@ export default function Checkout({ cart = [], setCart }) {
       customer_note: form.note || null,
       customer_total: Math.round(total) || 0,
 
-      payment_method: form.payment_method, // NEW: gửi phương thức thanh toán
+      payment_method: form.payment_method,
     };
+
+    // Chặn ở FE luôn cho nhanh
+    if (form.payment_method === "momo" && momoDisabled) {
+      setMsg("❌ " + momoReason);
+      return;
+    }
 
     try {
       setLoading(true);
-      const token = localStorage.getItem("token");
+      const token =
+        localStorage.getItem("customer_token") ||
+        localStorage.getItem("token");
 
       const res = await fetch(`${API_BASE}/checkout`, {
         method: "POST",
@@ -123,36 +141,38 @@ export default function Checkout({ cart = [], setCart }) {
       });
 
       let data = {};
-      try { data = await res.json(); } catch {}
+      try {
+        data = await res.json();
+      } catch {}
 
       if (res.status === 401) {
-        setMsg("Bạn chưa đăng nhập hoặc phiên đã hết hạn. Vui lòng đăng nhập lại.");
+        setMsg(
+          "Bạn chưa đăng nhập hoặc phiên đã hết hạn. Vui lòng đăng nhập lại."
+        );
         return;
       }
 
       if (!res.ok || data?.success === false) {
-        const details =
-          data?.errors
-            ? Object.entries(data.errors)
-                .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
-                .join(" | ")
-            : null;
+        const details = data?.errors
+          ? Object.entries(data.errors)
+              .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`)
+              .join(" | ")
+          : null;
         const apiMsg = data?.message || details || `HTTP ${res.status}`;
         throw new Error(apiMsg);
       }
 
-      // NEW: nếu thanh toán online, BE sẽ trả payUrl để chuyển trang
+      // Online → redirect payUrl
       if (form.payment_method === "momo" && data?.payUrl) {
-        // không clear giỏ ngay, chờ ipn/return xác nhận
         window.location.href = data.payUrl;
         return;
       }
 
       // COD
       setMsg("✅ Đặt hàng thành công!");
-      setCart([]);                // clear state
-      localStorage.removeItem("cart"); // clear localStorage
-      window.dispatchEvent(new Event("cart:refresh")); // 🔔 thông báo cho Cart/Header
+      setCart([]);
+      localStorage.removeItem("cart");
+      window.dispatchEvent(new Event("cart:refresh"));
     } catch (e) {
       setMsg(`❌ Lỗi: ${e.message || e}`);
     } finally {
@@ -164,14 +184,25 @@ export default function Checkout({ cart = [], setCart }) {
     <div className="u-grid" style={{ gap: 16 }}>
       <h1 style={{ margin: 0 }}>Thanh toán</h1>
 
-      <div style={{ display: "grid", gap: 16, gridTemplateColumns: "1.2fr .8fr" }}>
+      <div
+        style={{
+          display: "grid",
+          gap: 16,
+          gridTemplateColumns: "1.2fr .8fr",
+        }}
+      >
         {/* Form */}
-        <div className="u-card u-border" style={{ padding: 16, display: "grid", gap: 10 }}>
+        <div
+          className="u-card u-border"
+          style={{ padding: 16, display: "grid", gap: 10 }}
+        >
           <input
             className="u-input"
             placeholder="Họ tên"
             value={form.customer_name}
-            onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
+            onChange={(e) =>
+              setForm({ ...form, customer_name: e.target.value })
+            }
           />
           <input
             className="u-input"
@@ -200,7 +231,6 @@ export default function Checkout({ cart = [], setCart }) {
             onChange={(e) => setForm({ ...form, note: e.target.value })}
           />
 
-          {/* NEW: Chọn phương thức thanh toán */}
           <div className="u-card u-border" style={{ padding: 12 }}>
             <b>Phương thức thanh toán</b>
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
@@ -209,18 +239,32 @@ export default function Checkout({ cart = [], setCart }) {
                   type="radio"
                   name="pm"
                   checked={form.payment_method === "cod"}
-                  onChange={() => setForm({ ...form, payment_method: "cod" })}
+                  onChange={() =>
+                    setForm({ ...form, payment_method: "cod" })
+                  }
                 />{" "}
                 Thanh toán khi nhận hàng (COD)
               </label>
-              <label>
+
+              <label
+                title={momoDisabled ? momoReason : ""}
+                style={{ opacity: momoDisabled ? 0.65 : 1 }}
+              >
                 <input
                   type="radio"
                   name="pm"
                   checked={form.payment_method === "momo"}
-                  onChange={() => setForm({ ...form, payment_method: "momo" })}
+                  onChange={() =>
+                    setForm({ ...form, payment_method: "momo" })
+                  }
+                  disabled={momoDisabled}
                 />{" "}
                 Ví MoMo / QR online
+                {momoDisabled && (
+                  <span className="u-chip" style={{ marginLeft: 8 }}>
+                    {momoReason}
+                  </span>
+                )}
               </label>
             </div>
           </div>
@@ -228,7 +272,10 @@ export default function Checkout({ cart = [], setCart }) {
           {msg && (
             <div
               className="u-card u-border"
-              style={{ padding: 10, color: msg.startsWith("✅") ? "#6fe0b1" : "#ff9b9b" }}
+              style={{
+                padding: 10,
+                color: msg.startsWith("✅") ? "#6fe0b1" : "#ff9b9b",
+              }}
             >
               {msg}
             </div>
@@ -254,8 +301,16 @@ export default function Checkout({ cart = [], setCart }) {
                 }}
               >
                 <img
-                  src={i.thumbnail_url || "https://placehold.co/60x40?text=No+Img"}
-                  style={{ width: 60, height: 40, objectFit: "cover", borderRadius: 8 }}
+                  src={
+                    i.thumbnail_url ||
+                    "https://placehold.co/60x40?text=No+Img"
+                  }
+                  style={{
+                    width: 60,
+                    height: 40,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                  }}
                 />
                 <div>
                   <div style={{ fontWeight: 700 }}>{i.name}</div>
@@ -269,8 +324,16 @@ export default function Checkout({ cart = [], setCart }) {
               </div>
             ))}
           </div>
-          <hr style={{ borderColor: "rgba(255,255,255,.08)", margin: "12px 0" }} />
-          <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 900 }}>
+          <hr
+            style={{ borderColor: "rgba(255,255,255,.08)", margin: "12px 0" }}
+          />
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              fontWeight: 900,
+            }}
+          >
             <div>Tổng cộng</div>
             <div>{VND.format(total)}₫</div>
           </div>

@@ -77,6 +77,8 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
 
     // Orders (admin)
     Route::patch ('/orders/{id}/status',   [OrderController::class, 'updateStatus']);
+     Route::get   ('/orders',             [OrderController::class, 'adminIndex']); 
+    Route::get   ('/orders/{id}',        [OrderController::class, 'adminShow']);
 });
 
 /* 404 */

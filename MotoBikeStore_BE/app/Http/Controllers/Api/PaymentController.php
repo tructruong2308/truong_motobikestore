@@ -3,8 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Models\Order;     // ntt_order model
-use App\Models\Payment;   // payments model
+use App\Models\Order;
+use App\Models\Payment;
 use App\Services\MomoService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -14,54 +14,90 @@ class PaymentController extends Controller
 {
     public function checkout(Request $r, MomoService $momo)
     {
-        // 1) validate form (name/phone/address ... bạn đã có logic rồi)
+        // 1) Validate
         $r->validate([
-            'items' => 'required|array|min:1',
-            'total' => 'required|integer|min:1000',
-            'payment_method' => 'required|in:cod,momo',
+            'items'           => 'required|array|min:1',
+            'total'           => 'required|integer|min:1000',
+            'payment_method'  => 'required|in:cod,momo',
+            'name'            => 'nullable|string|max:255',
+            'phone'           => 'nullable|string|max:50',
+            'email'           => 'nullable|email',
+            'address'         => 'nullable|string|max:1000',
+            'note'            => 'nullable|string',
         ]);
 
         return DB::transaction(function () use ($r, $momo) {
-            // 2) Tạo Order (pending)
-            $order = Order::create([
-                'user_id'         => optional($r->user())->id,
-                'name'            => $r->name ?? $r->customer_name,
-                'phone'           => $r->phone ?? $r->customer_phone,
-                'email'           => $r->email ?? $r->customer_email,
-                'address'         => $r->address ?? $r->customer_address,
-                'note'            => $r->note ?? $r->customer_note,
-                'total'           => $r->total,
-                'status'          => 'pending',
-                'payment_method'  => $r->payment_method,
-                'payment_status'  => 'unpaid',
-            ]);
-            // TODO: insert order details từ $r->items …
+            $amount = (int) $r->total;
 
+            // 2) Tạo đơn (status tinyint)
+            $order = Order::create([
+                'user_id'        => optional($r->user())->id,
+                'name'           => $r->name ?? $r->customer_name,
+                'phone'          => $r->phone ?? $r->customer_phone,
+                'email'          => $r->email ?? $r->customer_email,
+                'address'        => $r->address ?? $r->customer_address,
+                'note'           => $r->note ?? $r->customer_note,
+                'total'          => $amount,
+                'status'         => Order::STATUS_PENDING,   // ✅ tinyint
+                'payment_method' => $r->payment_method,      // varchar(20)
+                // Có thể có cột payment_status, nếu chưa có thì bỏ đi
+                // 'payment_status' => 'unpaid',
+            ]);
+
+            // (tuỳ chọn) Lưu order_details từ $r->items
+            // ...
+
+            // 3) COD → trả luôn
             if ($r->payment_method === 'cod') {
                 return response()->json([
-                    'success' => true,
-                    'message' => 'Đặt hàng thành công (COD).',
-                    'order_id'=> $order->id,
+                    'success'  => true,
+                    'message'  => 'Đặt hàng thành công (COD).',
+                    'order_id' => $order->id,
                 ]);
             }
 
-            // 3) Online (MoMo) -> tạo Payment + tạo request
-            $requestId = (string) Str::uuid();
+            // 4) MoMo – Kiểm tra hạn mức sandbox (1.000 – 50.000.000)
+            if ($amount < 1000) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Số tiền MoMo phải >= 1.000 VND.',
+                ], 422);
+            }
+            if ($amount > 50_000_000) {
+                // Cho test sandbox: có thể ép số tiền gửi đi nhỏ lại
+                $force = (int) env('MOMO_FORCE_AMOUNT', 0);
+                if ($force <= 0) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'MoMo sandbox chỉ cho phép tối đa 50.000.000đ/giao dịch. Vui lòng giảm số lượng hoặc chọn COD.',
+                    ], 422);
+                }
+            }
+
+            // 5) Số tiền gửi cho MoMo (ép khi test)
+            $gatewayAmount = $amount;
+            $forced = (int) env('MOMO_FORCE_AMOUNT', 0);
+            if ($forced > 0) {
+                $gatewayAmount = max(1000, min(50_000_000, $forced));
+            }
+
+            // 6) Tạo bản ghi Payment
             $payment = Payment::create([
-                'order_id'  => $order->id,
-                'provider'  => 'momo',
-                'amount'    => $order->total,
-                'status'    => 'pending',
+                'order_id'   => $order->id,
+                'provider'   => 'momo',
+                'amount'     => $gatewayAmount, // số tiền gửi sang MoMo
+                'status'     => 'pending',
+                'request_id' => (string) Str::uuid(),
             ]);
 
+            // 7) Gọi MoMo
             $create = $momo->createPayment([
-                'orderId'   => (string)$order->id, // dùng id order làm mã
-                'amount'    => $order->total,
+                'orderId'   => (string) $order->id,
+                'amount'    => $gatewayAmount,
                 'orderInfo' => "Thanh toan don #{$order->id}",
-                'requestId' => $requestId,
+                'requestId' => $payment->request_id,
             ]);
 
-            // Lưu response thô để debug
             $payment->update(['response_payload' => $create]);
 
             if (($create['resultCode'] ?? 99) !== 0) {
@@ -72,24 +108,22 @@ class PaymentController extends Controller
                 ], 422);
             }
 
-            // Lưu mã giao dịch gateway ~ payUrl, orderId, requestId…
-            $order->update([
-                'gateway_order_code' => $create['orderId'] ?? null,
-            ]);
+            // (tuỳ chọn) lưu thêm mã đơn gateway nếu cần
+            if (!empty($create['orderId'])) {
+                $order->update(['gateway_order_code' => $create['orderId']]);
+            }
 
             return response()->json([
-                'success' => true,
-                'payUrl'  => $create['payUrl'],
-                'order_id'=> $order->id,
+                'success'  => true,
+                'payUrl'   => $create['payUrl'] ?? null,
+                'order_id' => $order->id,
             ]);
         });
     }
 
-    // MoMo redirect user về đây
+    // MoMo redirect user về đây (hiển thị/redirect FE)
     public function momoReturn(Request $r)
     {
-        // Người dùng quay lại – nên hiển thị trang “đang xác minh”
-        // FE có thể đọc query (resultCode, orderId, message…) rồi call API /payments/query để confirm.
         return response()->json([
             'message' => 'RETURN from MoMo',
             'query'   => $r->all(),
@@ -99,56 +133,46 @@ class PaymentController extends Controller
     // MoMo gọi IPN về đây (server-to-server)
     public function momoIpn(Request $r, MomoService $momo)
     {
-        $params = $r->all();
-        // 1) signature
-        // (nhiều test sandbox không gửi đủ trường cho raw – bạn log $params để ráp raw chuẩn)
-        // if (!$momo->verifySignature($params)) {
-        //     return response()->json(['message'=>'Invalid signature'], 400);
-        // }
+        $params     = $r->all();
+        $orderId    = $params['orderId'] ?? null;
+        $resultCode = (int)($params['resultCode'] ?? 99);
+        $amount     = (int)($params['amount'] ?? 0);
+        $transId    = $params['transId'] ?? null;
 
-        $orderId   = $params['orderId'] ?? null;
-        $resultCode= (int)($params['resultCode'] ?? 99);
-        $amount    = (int)($params['amount'] ?? 0);
-        $transId   = $params['transId'] ?? null;
-
-        if (!$orderId) return response()->json(['message'=>'No orderId'], 400);
-
+        if (!$orderId) return response()->json(['message' => 'No orderId'], 400);
         $order = Order::find($orderId);
-        if (!$order) return response()->json(['message'=>'Order not found'], 404);
+        if (!$order) return response()->json(['message' => 'Order not found'], 404);
 
-        // 2) kiểm tra số tiền
-        if ($amount !== (int)$order->total) {
-            return response()->json(['message'=>'Invalid amount'], 400);
+        // Nếu lúc checkout đã ép amount gửi cho MoMo, thì đối chiếu theo payments
+        $payment = $order->payments()->where('provider', 'momo')->latest()->first();
+        if ($payment && $amount !== (int) $payment->amount) {
+            return response()->json(['message' => 'Invalid amount'], 400);
         }
 
-        // 3) cập nhật
         if ($resultCode === 0) {
             $order->update([
-                'payment_status' => 'paid',
-                'status'         => 'completed',
-                'paid_at'        => now(),
+                'status'  => Order::STATUS_COMPLETED,
+                'paid_at' => now(),
+                // 'payment_status' => 'paid', // nếu có cột
             ]);
-            $payment = $order->payments()->latest()->first();
             if ($payment) {
                 $payment->update([
-                    'status' => 'paid',
-                    'provider_txn_id' => $transId,
+                    'status'           => 'paid',
+                    'provider_txn_id'  => $transId,
                     'response_payload' => $params,
                 ]);
             }
         } else {
-            $order->update(['payment_status'=>'failed']);
-            $payment = $order->payments()->latest()->first();
+            // 'payment_status' => 'failed' nếu có cột
             if ($payment) {
                 $payment->update([
-                    'status' => 'failed',
-                    'provider_txn_id' => $transId,
+                    'status'           => 'failed',
+                    'provider_txn_id'  => $transId,
                     'response_payload' => $params,
                 ]);
             }
         }
 
-        // MoMo yêu cầu trả 200/OK
-        return response()->json(['message'=>'ipn handled']);
+        return response()->json(['message' => 'ipn handled']);
     }
 }

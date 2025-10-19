@@ -20,14 +20,17 @@ class Order extends Model
         'email',
         'address',
         'note',
+        'total',
+        'payment_method',
+        'paid_at',
         'status',
         'updated_by',
-        // 'total', // nếu DB có cột total, bật lên
     ];
 
     protected $casts = [
-        'status' => 'integer',
-        // 'total'  => 'float',
+        'status'  => 'integer',
+        'total'   => 'integer',
+        'paid_at' => 'datetime',
     ];
 
     // Trạng thái chuẩn hoá
@@ -45,17 +48,15 @@ class Order extends Model
             self::STATUS_PROCESSING => 'Processing',
             self::STATUS_COMPLETED  => 'Completed',
             self::STATUS_CANCELLED  => 'Cancelled',
-            default => (string) $this->status,
+            default                 => (string) $this->status,
         };
     }
 
-    // 1 đơn có nhiều chi tiết
     public function details()
     {
         return $this->hasMany(OrderDetail::class, 'order_id', 'id');
     }
 
-    // (tuỳ chọn) tổng tiền tính động nếu không lưu cột total
     public function getTotalComputedAttribute(): float
     {
         if (array_key_exists('details_sum_amount', $this->attributes)) {
@@ -64,6 +65,8 @@ class Order extends Model
         return (float) $this->details()->sum('amount');
     }
 
-    public function payments() { return $this->hasMany(\App\Models\Payment::class); }
+    public function payments()
+    {
+        return $this->hasMany(\App\Models\Payment::class, 'order_id', 'id');
+    }
 }
-
