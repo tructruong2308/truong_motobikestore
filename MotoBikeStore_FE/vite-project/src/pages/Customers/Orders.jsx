@@ -97,7 +97,7 @@ const css = `
 .ordersX .noticeHead{ display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; color:#d1fae5 }
 .ordersX .noticeList{ display:grid; gap:8px }
 .ordersX .noticeItem{ display:flex; justify-content:space-between; gap:12px; align-items:center; 
-  background:rgba(15,23,42,.6); border:1px solid rgba(34,197,94,.25); border-radius:12px; padding:8px 10px; color:#bbf7d0 }
+  background:rgba(15,23,42,.6); border:1px solid rgba(34,197,94,.25); border-radius:12px; padding:8px 10px; color:#bbf7d0; cursor:pointer }
 .ordersX .noticeActions{ display:flex; gap:6px }
 .ordersX .xbtn{ height:30px; padding:0 10px; border-radius:8px; border:1px solid rgba(34,197,94,.35); background:#0f172a; color:#d1fae5; cursor:pointer }
 
@@ -166,8 +166,25 @@ export default function Orders() {
   // ===== Overlay toàn cửa sổ =====
   const [overlay, setOverlay] = useState({ open: false, orderId: null, text: "", status: null, at: "" });
 
-  // 🔵 NEW: highlightId để làm nổi & cuộn tới đúng đơn khi điều hướng từ Bell
+  // 🔵 highlightId để làm nổi & cuộn tới đúng đơn khi điều hướng/click
   const [highlightId, setHighlightId] = useState(null);
+
+  // 👉 Hàm dùng chung: cuộn + highlight (bấm nhiều lần vẫn nháy)
+  const focusOrder = (orderId) => {
+    const idNum = Number(orderId);
+    // reset để có thể kích hoạt lại animation nhiều lần
+    setHighlightId(null);
+    // đợi 1 nhịp để lớp .highlight bị gỡ, sau đó set lại
+    setTimeout(() => {
+      setHighlightId(idNum);
+      const el = document.getElementById(`order-${idNum}`);
+      if (el && typeof el.scrollIntoView === "function") {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      // tắt highlight sau 6s
+      setTimeout(() => setHighlightId((cur) => (Number(cur) === idNum ? null : cur)), 6000);
+    }, 60);
+  };
 
   // Tự ẩn overlay sau N ms
   useEffect(() => {
@@ -240,24 +257,8 @@ export default function Orders() {
     let id = null;
     try { id = sessionStorage.getItem("focus_order_id"); } catch {}
     if (!id) return;
-
-    const numId = Number(id);
-    setHighlightId(numId);
-
-    // cuộn sau 1 nhịp để DOM có list
-    setTimeout(() => {
-      const el = document.getElementById(`order-${numId}`);
-      if (el && typeof el.scrollIntoView === "function") {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
-      }
-    }, 150);
-
-    // clear để reload lại không còn highlight
+    focusOrder(Number(id));
     try { sessionStorage.removeItem("focus_order_id"); } catch {}
-
-    // bỏ highlight sau 5s
-    const t = setTimeout(() => setHighlightId(null), 5000);
-    return () => clearTimeout(t);
   }, []);
 
   /* ===== REALTIME Reverb ===== */
@@ -433,13 +434,7 @@ export default function Orders() {
                 className="overlayBtn primary"
                 onClick={() => {
                   setOverlay(o => ({ ...o, open: false }));
-                  const id = overlay.orderId;
-                  if (id) {
-                    setHighlightId(id);
-                    const el = document.getElementById(`order-${id}`);
-                    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-                    setTimeout(() => setHighlightId(null), 5000);
-                  }
+                  if (overlay.orderId) focusOrder(overlay.orderId);
                 }}
               >
                 Xem đơn
@@ -460,14 +455,26 @@ export default function Orders() {
           </div>
           <div className="noticeList">
             {notices.map(n => (
-              <div className="noticeItem" key={n.id}>
+              <div
+                className="noticeItem"
+                key={n.id}
+                onClick={() => n.orderId && focusOrder(n.orderId)}
+              >
                 <div>
                   <div style={{ fontWeight: 800 }}>{n.text}</div>
                   <div style={{ opacity: .75, fontSize: 12 }}>
                     {new Date(n.at).toLocaleString()}
                   </div>
                 </div>
-                <button className="xbtn" onClick={() => removeNotice(n.id)}>X</button>
+                <button
+                  className="xbtn"
+                  onClick={(e) => {
+                    e.stopPropagation(); // không trigger focus khi bấm X
+                    removeNotice(n.id);
+                  }}
+                >
+                  X
+                </button>
               </div>
             ))}
           </div>
@@ -517,7 +524,7 @@ export default function Orders() {
             <div
               key={o.id}
               id={`order-${o.id}`}
-              className={`card ${highlightId === o.id ? "highlight" : ""}`}
+              className={`card ${Number(highlightId) === Number(o.id) ? "highlight" : ""}`}
               style={{ marginBottom: 14 }}
             >
               <div className="head">

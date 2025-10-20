@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileController;
+use App\Http\Controllers\Api\CouponController;
 
 /* ---------- PUBLIC ---------- */
 Route::post('/register',        [AuthController::class, 'register']);
@@ -26,6 +27,9 @@ Route::get('/products/{id}/reviews', [ReviewController::class, 'index']);
 /* MoMo public callbacks */
 Route::get ('/payments/momo/return', [PaymentController::class, 'momoReturn']);
 Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
+
+// Coupons: kiểm tra áp dụng
+    Route::post('/coupons/validate', [CouponController::class, 'validateCode']);
 
 /* ---------- CUSTOMER (Sanctum) ---------- */
 Route::middleware(['auth:sanctum'])->group(function () {
@@ -47,6 +51,8 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Orders của khách
     Route::get ('/orders',      [OrderController::class, 'index']);
     Route::get ('/orders/{id}', [OrderController::class, 'show']);
+
+    
 });
 
 /* ---------- ADMIN (Sanctum + role) ---------- */
@@ -80,6 +86,14 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
     Route::patch ('/orders/{id}/status',   [OrderController::class, 'updateStatus']);
      Route::get   ('/orders',             [OrderController::class, 'adminIndex']); 
     Route::get   ('/orders/{id}',        [OrderController::class, 'adminShow']);
+
+    // Coupons
+    Route::get   ('/coupons',            [CouponController::class, 'index']);
+    Route::post  ('/coupons',            [CouponController::class, 'store']);
+    Route::put   ('/coupons/{id}',       [CouponController::class, 'update']);
+    Route::delete('/coupons/{id}',       [CouponController::class, 'destroy']);
+    Route::patch ('/coupons/{id}/toggle',[CouponController::class, 'toggle']);
+
 });
 
 /* 404 */

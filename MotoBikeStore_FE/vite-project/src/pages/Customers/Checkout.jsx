@@ -49,7 +49,7 @@ export default function Checkout({ cart = [], setCart }) {
   // vận chuyển & mã giảm giá
   const [ship, setShip] = useState("standard"); // standard|fast|express
   const [coupon, setCoupon] = useState("");
-  const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, type, value, desc}
+  const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
 
   // hệ thống
   const [loading, setLoading] = useState(false);
@@ -109,20 +109,19 @@ export default function Checkout({ cart = [], setCart }) {
     }
   }, [ship]);
 
+  // Ưu tiên số giảm giá trả về từ BE
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
-    const code = appliedCoupon.code.toUpperCase();
-    // Demo luật (FE): GIAM10 (10%), GIAM50K (-50k), FREESHIP (miễn phí ship)
-    if (code === "GIAM10") return Math.floor(subTotal * 0.10);
-    if (code === "GIAM50K") return Math.min(50000, subTotal);
-    if (code === "FREESHIP") return 0; // giảm ở ship, không trừ subtotal
+    if (appliedCoupon.discount_from_be != null) {
+      return Math.min(Number(appliedCoupon.discount_from_be) || 0, subTotal);
+    }
     return 0;
   }, [appliedCoupon, subTotal]);
 
   const shipAfterCoupon = useMemo(() => {
-    if (!appliedCoupon) return shippingFee;
-    return appliedCoupon.code?.toUpperCase() === "FREESHIP" ? 0 : shippingFee;
-  }, [appliedCoupon, shippingFee]);
+    // hiện BE chưa hỗ trợ freeship, nên giữ nguyên phí ship
+    return shippingFee;
+  }, [shippingFee]);
 
   const grandTotal = useMemo(
     () => Math.max(0, subTotal - discount) + shipAfterCoupon,
@@ -173,22 +172,41 @@ export default function Checkout({ cart = [], setCart }) {
   };
 
   /* =================== COUPON =================== */
-  const applyCoupon = () => {
+  // GỌI API validate thay vì luật demo
+  const applyCoupon = async () => {
     const code = (coupon || "").trim().toUpperCase();
-    if (!code) return setAppliedCoupon(null);
+    if (!code) { setAppliedCoupon(null); setMsg(""); return; }
 
-    // Luật demo (FE). Nếu BE của bạn có endpoint /coupons/validate, bạn có thể gọi ở đây.
-    if (["GIAM10", "GIAM50K", "FREESHIP"].includes(code)) {
-      const map = {
-        GIAM10: { desc: "Giảm 10% tổng hàng", type: "percent", value: 10 },
-        GIAM50K: { desc: "Giảm 50.000đ", type: "fixed", value: 50000 },
-        FREESHIP: { desc: "Miễn phí vận chuyển", type: "ship", value: 0 },
-      };
-      setAppliedCoupon({ code, ...map[code] });
-      setMsg("✅ Đã áp dụng mã " + code);
-    } else {
+    try {
+      setMsg("Đang kiểm tra mã…");
+      const token = localStorage.getItem("customer_token") || localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/coupons/validate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ code, subtotal: Math.round(subTotal) || 0 }),
+      });
+      const data = await res.json().catch(()=> ({}));
+
+      if (!res.ok || !data?.valid) {
+        setAppliedCoupon(null);
+        setMsg("❌ " + (data?.reason || "Mã không hợp lệ"));
+        return;
+      }
+
+      setAppliedCoupon({
+        code,
+        desc: "Áp dụng từ máy chủ",
+        discount_from_be: Number(data.discount || 0),
+        be: data.data,
+    });
+      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(Number(data.discount||0))}₫`);
+    } catch {
       setAppliedCoupon(null);
-      setMsg("❌ Mã không hợp lệ.");
+      setMsg("❌ Không kết nối được máy chủ");
     }
   };
 
@@ -513,7 +531,7 @@ export default function Checkout({ cart = [], setCart }) {
                 <div className="coupon">
                   <input
                     className="u-input"
-                    placeholder="Nhập mã (GIAM10 / GIAM50K / FREESHIP)"
+                    placeholder="Nhập mã giảm giá"
                     value={coupon}
                     onChange={(e) => setCoupon(e.target.value)}
                     style={{ flex: 1 }}

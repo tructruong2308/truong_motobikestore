@@ -23,53 +23,96 @@ class Order extends Model
         'status',
         'updated_by',
 
-        // ⚠️ Các cột có thật trong bảng của bạn
+        // Thanh toán
         'total',
         'payment_method',
         'paid_at',
+
+        // (Khuyến nghị thêm để khớp Checkout.jsx)
+        'subtotal',
+        'discount',
+        'shipping_method',
+        'shipping_fee',
+
+        // Coupon (tuỳ bạn có migration rồi thì bật)
+        'coupon_code',
+        'coupon_id',
     ];
 
     protected $casts = [
-        'status'   => 'integer',
-        'total'    => 'integer',
-        'paid_at'  => 'datetime',
+        'status'         => 'integer',
+        'total'          => 'integer',
+        'subtotal'       => 'integer',
+        'discount'       => 'integer',
+        'shipping_fee'   => 'integer',
+        'paid_at'        => 'datetime',
     ];
 
-    // Trạng thái chuẩn hoá (dùng số nguyên)
-    public const STATUS_PENDING    = 0;
-    public const STATUS_PROCESSING = 1;
-    public const STATUS_COMPLETED  = 2;
-    public const STATUS_CANCELLED  = 3;
+    /**
+     * Trạng thái đồng bộ với FE (Orders.jsx):
+     * 0: Chờ xác nhận, 1: Đã xác nhận, 2: Đang đóng gói,
+     * 3: Đang giao, 4: Đã giao, 5: Đã huỷ
+     */
+    public const STATUS_PENDING     = 0; // Chờ xác nhận
+    public const STATUS_CONFIRMED   = 1; // Đã xác nhận
+    public const STATUS_PACKING     = 2; // Đang đóng gói
+    public const STATUS_SHIPPING    = 3; // Đang giao
+    public const STATUS_DELIVERED   = 4; // Đã giao
+    public const STATUS_CANCELLED   = 5; // Đã huỷ
 
     protected $appends = ['status_label'];
 
     public function getStatusLabelAttribute(): string
     {
-        return match($this->status) {
-            self::STATUS_PENDING    => 'Pending',
-            self::STATUS_PROCESSING => 'Processing',
-            self::STATUS_COMPLETED  => 'Completed',
-            self::STATUS_CANCELLED  => 'Cancelled',
+        return match ($this->status) {
+            self::STATUS_PENDING   => 'Chờ xác nhận',
+            self::STATUS_CONFIRMED => 'Đã xác nhận',
+            self::STATUS_PACKING   => 'Đang đóng gói',
+            self::STATUS_SHIPPING  => 'Đang giao',
+            self::STATUS_DELIVERED => 'Đã giao',
+            self::STATUS_CANCELLED => 'Đã huỷ',
             default => (string) $this->status,
         };
     }
 
+    /** Chi tiết đơn */
     public function details()
     {
-        return $this->hasMany(OrderDetail::class, 'order_id', 'id');
+        return $this->hasMany(\App\Models\OrderDetail::class, 'order_id', 'id');
     }
 
-    // (tuỳ chọn) tổng tiền tính động nếu không lưu cột total
-    public function getTotalComputedAttribute(): float
+    /** Tổng tiền tính động (nếu cần) */
+    public function getTotalComputedAttribute(): int
     {
         if (array_key_exists('details_sum_amount', $this->attributes)) {
-            return (float) $this->attributes['details_sum_amount'];
+            return (int) $this->attributes['details_sum_amount'];
         }
-        return (float) $this->details()->sum('amount');
+        return (int) $this->details()->sum('amount');
     }
 
+    /** Các lần thanh toán (MoMo, v.v.) */
     public function payments()
     {
         return $this->hasMany(\App\Models\Payment::class);
+    }
+
+    /** Lần áp mã (nếu dùng bảng coupon_redemptions như đã hướng dẫn) */
+    public function couponRedemption()
+    {
+        return $this->hasOne(\App\Models\CouponRedemption::class, 'order_id', 'id');
+    }
+
+    /** Coupon tương ứng (qua redemption) */
+    public function coupon()
+    {
+        // order -> coupon_redemptions(order_id) -> coupon(coupon_id)
+        return $this->hasOneThrough(
+            \App\Models\Coupon::class,
+            \App\Models\CouponRedemption::class,
+            'order_id',   // FK trên coupon_redemptions trỏ về orders
+            'id',         // PK trên coupons
+            'id',         // PK trên orders
+            'coupon_id'   // FK trên coupon_redemptions trỏ về coupons
+        );
     }
 }

@@ -1,5 +1,7 @@
+// src/components/AdminSidebar.jsx
 import { NavLink } from "react-router-dom";
 import { FiHome, FiBox, FiTag, FiShoppingCart, FiUsers } from "react-icons/fi";
+import { LuTicketPercent } from "react-icons/lu"; // 👈 Icon voucher % (Lucide)
 
 const styles = `
 .admin-sidebar{ height:100%; padding:16px; background:#0b0f1a; color:var(--text) }
@@ -47,6 +49,9 @@ export default function AdminSidebar() {
         </NavLink>
         <NavLink to="/admin/users" style={linkStyle} className={({isActive})=>isActive?"active":""}>
           <FiUsers /> Users
+        </NavLink>
+        <NavLink to="/admin/coupons" style={linkStyle} className={({isActive})=>isActive?"active":""}>
+          <LuTicketPercent /> Coupon
         </NavLink>
       </nav>
     </div>
