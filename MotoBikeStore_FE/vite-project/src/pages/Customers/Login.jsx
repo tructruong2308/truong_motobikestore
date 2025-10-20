@@ -43,6 +43,15 @@ export default function Login() {
       localStorage.setItem("token", data.token);              // legacy cho các trang đang dùng
       localStorage.setItem("user", JSON.stringify(data.user)); // legacy cho các trang đang dùng
 
+      // 🔄 Khôi phục giỏ theo user
+      try {
+        const u = data.user;
+        const userCartKey = u?.id ? `cart_u_${u.id}` : "cart_guest";
+        const saved = JSON.parse(localStorage.getItem(userCartKey) || "[]");
+        localStorage.setItem("cart", JSON.stringify(Array.isArray(saved) ? saved : []));
+        window.dispatchEvent(new Event("cart:refresh"));
+      } catch {}
+
       // Cho header/cart sync biết
       window.dispatchEvent(new Event("user:refresh"));
 

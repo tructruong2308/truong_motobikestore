@@ -8,9 +8,11 @@ return new class extends Migration {
         Schema::create('product_review_images', function (Blueprint $t) {
             $t->id();
             $t->foreignId('review_id')->constrained('product_reviews')->onDelete('cascade');
-            $t->string('image'); // path
+            $t->string('image', 255); // đường dẫn file trong storage/app/public
             $t->timestamps();
         });
     }
-    public function down(): void { Schema::dropIfExists('product_review_images'); }
+    public function down(): void {
+        Schema::dropIfExists('product_review_images');
+    }
 };

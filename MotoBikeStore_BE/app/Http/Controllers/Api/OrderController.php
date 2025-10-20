@@ -8,6 +8,7 @@ use App\Models\Order;
 use App\Models\OrderDetail;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use App\Events\OrderStatusUpdated;
 
 class OrderController extends Controller
 {
@@ -342,7 +343,7 @@ class OrderController extends Controller
     }
 
     /* ================== Admin cập nhật trạng thái ================== */
-    public function updateStatus(Request $request, $id)
+        public function updateStatus(Request $request, $id)
     {
         $order = Order::find($id);
         if (!$order) {
@@ -352,6 +353,13 @@ class OrderController extends Controller
         $request->validate(['status' => 'required|integer']);
         $order->status = (int) $request->input('status');
         $order->save();
+
+        // TÍNH LẠI total nếu muốn gửi kèm
+        $order->loadMissing('details');
+        $order->total = $order->details->sum(fn($d) => ($d->price_buy ?? 0) * ($d->qty ?? 0));
+
+        // 🔔 BẮN EVENT
+        event(new OrderStatusUpdated($order));
 
         return response()->json(['message' => 'Status updated']);
     }

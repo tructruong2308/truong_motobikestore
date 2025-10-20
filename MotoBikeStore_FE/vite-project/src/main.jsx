@@ -13,6 +13,11 @@ import {
 import "./index.css";
 import "./styles/theme.css";
 
+/* ==== Notifications (GLOBAL) ==== */
+import { NotificationProvider } from "./notifications/NotificationProvider.jsx";
+import RealtimeListener from "./realtime/RealtimeListener.jsx";
+import Bell from "./notifications/Bell.jsx";
+
 /* Customer pages */
 import Home from "./pages/Customers/Home";
 import Products from "./pages/Customers/Products";
@@ -39,6 +44,13 @@ import ProductEdit from "./pages/Admin/Product/ProductEdit";
 /* NEW: header search with suggestions */
 import HeaderSearch from "./components/HeaderSearch";
 
+/* Helpers */
+const getCustomer = () => {
+  try { return JSON.parse(localStorage.getItem("customer_user") || "null"); }
+  catch { return null; }
+};
+const getUserCartKey = (u) => (u?.id ? `cart_u_${u.id}` : "cart_guest");
+
 /* Helpers: logout khách */
 const customerLogout = async () => {
   const token = localStorage.getItem("customer_token");
@@ -53,9 +65,17 @@ const customerLogout = async () => {
         },
       }).catch(() => {});
     }
+    const u = getCustomer();
+    const key = getUserCartKey(u);
+    const currentCart = JSON.parse(localStorage.getItem("cart") || "[]");
+    localStorage.setItem(key, JSON.stringify(currentCart || []));
   } finally {
     localStorage.removeItem("customer_token");
     localStorage.removeItem("customer_user");
+    localStorage.removeItem("token"); // legacy
+    localStorage.removeItem("user");  // legacy
+    localStorage.setItem("cart", JSON.stringify([]));
+    window.dispatchEvent(new Event("cart:refresh"));
     window.location.href = "/login";
   }
 };
@@ -148,6 +168,7 @@ function Layout({ children }) {
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
   };
   const brand = {
     display: "flex",
@@ -257,8 +278,13 @@ function Layout({ children }) {
             <LinkItem to="/cart" label="Giỏ hàng" />
           </nav>
 
-          {/* Ô tìm kiếm có gợi ý (component mới) */}
+          {/* Ô tìm kiếm có gợi ý */}
           <HeaderSearch />
+
+          {/* 🔔 Chuông thông báo toàn site (unread badge) */}
+          <div style={{ marginLeft: 8 }}>
+            <Bell />
+          </div>
 
           {/* AVATAR + RING + DROPDOWN */}
           <div style={{ position: "relative" }}>
@@ -467,9 +493,16 @@ function AdminProtected({ children }) {
 /* App */
 function App() {
   const [cart, setCart] = useState(() => JSON.parse(localStorage.getItem("cart") || "[]"));
+
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart));
     window.dispatchEvent(new Event("cart:refresh"));
+    try {
+      const u = getCustomer();
+      if (u?.id) {
+        localStorage.setItem(getUserCartKey(u), JSON.stringify(cart || []));
+      }
+    } catch {}
   }, [cart]);
 
   const addToCart = (product) => {
@@ -506,36 +539,41 @@ function App() {
   };
 
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Khách */}
-        <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/products" element={<Layout><Products addToCart={addToCart} /></Layout>} />
-        <Route path="/category/:id" element={<Layout><CategoryProducts addToCart={addToCart} /></Layout>} />
-        <Route path="/products/:id" element={<Layout><ProductDetail addToCart={addToCart} /></Layout>} />
-        <Route path="/checkout" element={<Layout><Checkout cart={cart} setCart={setCart} /></Layout>} />
-        <Route path="/cart" element={<Layout><Cart cart={cart} setCart={setCart} /></Layout>} />
-        <Route path="/register" element={<Layout><Register /></Layout>} />
-        <Route path="/login" element={<Layout><Login /></Layout>} />
-        <Route path="/profile" element={<Layout><CustomerProtected><Profile /></CustomerProtected></Layout>} />
-        <Route path="/orders" element={<Layout><CustomerProtected><Orders /></CustomerProtected></Layout>} />
+    <NotificationProvider>
+      {/* Kết nối Reverb & nghe sự kiện toàn site */}
+      <RealtimeListener />
 
-        {/* Admin */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin" element={<AdminProtected><AdminLayout /></AdminProtected>}>
-          <Route index element={<Dashboard />} />
-          <Route path="products" element={<AdminProducts />} />
-          <Route path="products/new" element={<ProductAdd />} />
-          <Route path="products/:id/edit" element={<ProductEdit />} />
-          <Route path="categories" element={<AdminCategories />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="users" element={<AdminUsers />} />
-        </Route>
+      <BrowserRouter>
+        <Routes>
+          {/* Khách */}
+          <Route path="/" element={<Layout><Home /></Layout>} />
+          <Route path="/products" element={<Layout><Products addToCart={addToCart} /></Layout>} />
+          <Route path="/category/:id" element={<Layout><CategoryProducts addToCart={addToCart} /></Layout>} />
+          <Route path="/products/:id" element={<Layout><ProductDetail addToCart={addToCart} /></Layout>} />
+          <Route path="/checkout" element={<Layout><Checkout cart={cart} setCart={setCart} /></Layout>} />
+          <Route path="/cart" element={<Layout><Cart cart={cart} setCart={setCart} /></Layout>} />
+          <Route path="/register" element={<Layout><Register /></Layout>} />
+          <Route path="/login" element={<Layout><Login /></Layout>} />
+          <Route path="/profile" element={<Layout><CustomerProtected><Profile /></CustomerProtected></Layout>} />
+          <Route path="/orders" element={<Layout><CustomerProtected><Orders /></CustomerProtected></Layout>} />
 
-        {/* 404 */}
-        <Route path="*" element={<Layout><div>Không tìm thấy trang</div></Layout>} />
-      </Routes>
-    </BrowserRouter>
+          {/* Admin */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/admin" element={<AdminProtected><AdminLayout /></AdminProtected>}>
+            <Route index element={<Dashboard />} />
+            <Route path="products" element={<AdminProducts />} />
+            <Route path="products/new" element={<ProductAdd />} />
+            <Route path="products/:id/edit" element={<ProductEdit />} />
+            <Route path="categories" element={<AdminCategories />} />
+            <Route path="orders" element={<AdminOrders />} />
+            <Route path="users" element={<AdminUsers />} />
+          </Route>
+
+          {/* 404 */}
+          <Route path="*" element={<Layout><div>Không tìm thấy trang</div></Layout>} />
+        </Routes>
+      </BrowserRouter>
+    </NotificationProvider>
   );
 }
 

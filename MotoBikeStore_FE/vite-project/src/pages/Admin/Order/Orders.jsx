@@ -9,16 +9,6 @@ import FilterBar from "../../../components/ui/FilterBar";
 const API_BASE = "http://127.0.0.1:8000/api";
 const VND = new Intl.NumberFormat("vi-VN");
 
-/* ========= Trạng thái kiểu Shopee =========
-   Mặc định mình dùng mã số sau (FE & PATCH /orders/{id}/status):
-   0: Chờ xác nhận
-   1: Đã xác nhận
-   2: Đang đóng gói
-   3: Đang giao
-   4: Đã giao
-   5: Đã huỷ
-   (Có thể thêm: 6=Trả hàng/Hoàn tiền nếu bạn muốn)
-*/
 const LABEL_BY_STATUS = {
   0: "Chờ xác nhận",
   1: "Đã xác nhận",
@@ -28,15 +18,13 @@ const LABEL_BY_STATUS = {
   5: "Đã huỷ",
 };
 const COLOR_BY_STATUS = {
-  0: "warning", // vàng
-  1: "info",    // lam
-  2: "purple",  // tím
-  3: "primary", // xanh lam
-  4: "success", // xanh lá
-  5: "danger",  // đỏ
+  0: "warning",
+  1: "info",
+  2: "purple",
+  3: "primary",
+  4: "success",
+  5: "danger",
 };
-
-// Thứ tự bước để render stepper
 const STATUS_FLOW = [0, 1, 2, 3, 4];
 const TAB_OPTIONS = [
   { k: "all", label: "Tất cả" },
@@ -75,7 +63,6 @@ export default function Orders() {
     return h;
   };
 
-  // ===== STYLE =====
   const styles = `
   .admin-orders .kpi-grid{ display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
   .admin-orders .kpi{ display:flex; align-items:center; gap:12px; padding:12px 14px;
@@ -85,7 +72,6 @@ export default function Orders() {
     border-radius:10px; background:rgba(100,116,139,.20); color:#cbd5e1; }
   .admin-orders .kpi h4{ margin:0; font-size:13px; opacity:.8 }
   .admin-orders .kpi b{ font-size:18px }
-
   .admin-orders .table-wrap{ border:1px solid rgba(100,116,139,.22);
     border-radius:14px; overflow:hidden; background:#0e1320; }
   .admin-orders table{ width:100%; border-collapse:separate; border-spacing:0 }
@@ -94,17 +80,13 @@ export default function Orders() {
   .admin-orders tbody td{ padding:12px 14px; border-bottom:1px solid rgba(100,116,139,.14); color:#e5e7eb; }
   .admin-orders tbody tr:hover{ background:rgba(148,163,184,.08) }
   .admin-orders tbody tr:nth-child(even){ background:rgba(148,163,184,.05) }
-
   .admin-orders .status-select{ height:34px; border-radius:10px; background:#0b1220; color:#e5e7eb; border:1px solid rgba(100,116,139,.35); padding:0 10px; }
   .admin-orders .actions{ display:flex; gap:8px; align-items:center }
   .admin-orders .btn-sm{ height:34px; padding:0 12px; border-radius:10px }
-
   .admin-orders .quick-status{ display:flex; gap:8px; flex-wrap:wrap; }
   .admin-orders .chip{ padding:6px 10px; border-radius:999px;
     border:1px solid rgba(100,116,139,.35); background:#0b1220; color:#cbd5e1; cursor:pointer; }
   .admin-orders .chip.active{ background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.45); color:#bbf7d0; }
-
-  /* stepper */
   .stepper{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
   .step{ display:flex; align-items:center; gap:8px; }
   .step .dot{ width:12px; height:12px; border-radius:50%; background:#64748b; border:2px solid #1f2937; }
@@ -113,9 +95,7 @@ export default function Orders() {
   .stepper .sep{ width:24px; height:2px; background:rgba(148,163,184,.35); border-radius:2px; }
   `;
 
-  // ===== normalize =====
   const normalizeOrder = (o) => {
-    // details có thể chứa product
     const details = Array.isArray(o.details) ? o.details : (o.items || o.order_details || []);
     const total = Number(
       o.total ??
@@ -123,32 +103,27 @@ export default function Orders() {
         ? details.reduce((s, d) => s + Number(d.price_buy || d.price || 0) * Number(d.qty || 0), 0)
         : 0)
     );
-
     return {
       id: o.id,
       name: o.name ?? "",
       email: o.email ?? "",
       phone: o.phone ?? "",
       address: o.address ?? "",
-      status: Number(o.status ?? 0), // map về số
+      status: Number(o.status ?? 0),
       total,
       created_at: o.created_at ?? o.createdAt ?? "",
       _raw: o,
     };
   };
 
-  // ===== fetch =====
   const fetchOrders = async () => {
     try {
       setLoading(true);
       setErr("");
-      // Lưu ý: Ở route của bạn hiện /api/orders nằm trong nhóm CUSTOMER,
-      // còn admin muốn xem tất cả đơn thì bạn nên tạo riêng route admin GET /admin/orders
-      // Tạm thời vẫn dùng /api/orders nếu BE đã cho admin token xem tất cả
-      const res = await fetch(`${API_BASE}/orders`, { headers: authHeaders(false), cache: "no-store" });
+      // dùng endpoint ADMIN
+      const res = await fetch(`${API_BASE}/admin/orders`, { headers: authHeaders(false), cache: "no-store" });
       if (res.status === 401 || res.status === 403) { handle401(); return; }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
       const data = await res.json().catch(() => ({}));
       const list = (Array.isArray(data) && data) || data?.data || data?.orders || data?.items || [];
       setItems(list.map(normalizeOrder));
@@ -161,23 +136,15 @@ export default function Orders() {
   };
   useEffect(() => { fetchOrders(); /* eslint-disable-next-line */ }, []);
 
-  // ===== derived =====
   const filtered = useMemo(() => {
     let out = items;
-
     if (q) {
       const s = q.trim().toLowerCase();
       out = out.filter((o) =>
-        [o.id, o.name, o.email, o.phone, o.address]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase()
-          .includes(s)
+        [o.id, o.name, o.email, o.phone, o.address].filter(Boolean).join(" ").toLowerCase().includes(s)
       );
     }
-
     if (statusTab !== "all") out = out.filter((o) => String(o.status) === String(statusTab));
-
     const dir = sort.dir === "asc" ? 1 : -1;
     out = [...out].sort((a, b) => {
       const ka = a[sort.key]; const kb = b[sort.key];
@@ -207,12 +174,11 @@ export default function Orders() {
   const openDetail = async (o) => {
     setSel({ ...o, _loading: true });
     try {
-      const res = await fetch(`${API_BASE}/orders/${o.id}`, { headers: authHeaders(false) });
+      // endpoint ADMIN
+      const res = await fetch(`${API_BASE}/admin/orders/${o.id}`, { headers: authHeaders(false) });
       if (res.status === 401 || res.status === 403) { handle401(); return; }
       if (res.ok) {
         const d = await res.json().catch(() => ({}));
-
-        // dựng items chuẩn cho modal
         const details = Array.isArray(d.details) ? d.details : (d.items || d.order_details || []);
         const items = (details || []).map((it) => {
           const p = it.product || {};
@@ -220,15 +186,8 @@ export default function Orders() {
           const thumb = p.thumbnail_url || p.thumbnail || it.thumbnail_url || it.image_url || it.image || "https://placehold.co/60x40?text=No+Img";
           const price = Number(it.price_buy ?? it.price ?? 0);
           const qty = Number(it.qty ?? 0);
-          return {
-            name,
-            thumbnail_url: thumb,
-            qty,
-            price,
-            total: qty * price,
-          };
+          return { name, thumbnail_url: thumb, qty, price, total: qty * price };
         });
-
         const normalized = normalizeOrder(d.id ? d : o);
         setSel({ ...normalized, items, _loading: false });
       } else {
@@ -242,7 +201,8 @@ export default function Orders() {
   async function updateStatus(orderId, nextStatus) {
     try {
       setPendingId(orderId);
-      const res = await fetch(`${API_BASE}/orders/${orderId}/status`, {
+      // endpoint ADMIN
+      const res = await fetch(`${API_BASE}/admin/orders/${orderId}/status`, {
         method: "PATCH",
         headers: authHeaders(true),
         body: JSON.stringify({ status: Number(nextStatus) }),
@@ -280,7 +240,6 @@ export default function Orders() {
     a.click();
   };
 
-  // Stepper trong modal chi tiết
   const Stepper = ({ value }) => (
     <div className="stepper">
       {STATUS_FLOW.map((s, idx) => (
@@ -307,59 +266,30 @@ export default function Orders() {
         <Button onClick={exportCSV} className="btn-sm">Xuất CSV</Button>
       </div>
 
-      {/* KPI */}
       <div className="kpi-grid">
-        <div className="kpi">
-          <i>🧾</i>
-          <div><h4>Tổng đơn</h4><b>{kpi.all}</b></div>
-        </div>
-        <div className="kpi">
-          <i>💰</i>
-          <div><h4>Doanh thu</h4><b>{VND.format(kpi.sum)}₫</b></div>
-        </div>
-        <div className="kpi">
-          <i>✅</i>
-          <div><h4>Đã giao</h4><b>{kpi[4] || 0}</b></div>
-        </div>
-        <div className="kpi">
-          <i>📦</i>
-          <div><h4>Đang giao</h4><b>{kpi[3] || 0}</b></div>
-        </div>
-        <div className="kpi">
-          <i>❌</i>
-          <div><h4>Đã huỷ</h4><b>{kpi[5] || 0}</b></div>
-        </div>
+        <div className="kpi"><i>🧾</i><div><h4>Tổng đơn</h4><b>{kpi.all}</b></div></div>
+        <div className="kpi"><i>💰</i><div><h4>Doanh thu</h4><b>{VND.format(kpi.sum)}₫</b></div></div>
+        <div className="kpi"><i>✅</i><div><h4>Đã giao</h4><b>{kpi[4] || 0}</b></div></div>
+        <div className="kpi"><i>📦</i><div><h4>Đang giao</h4><b>{kpi[3] || 0}</b></div></div>
+        <div className="kpi"><i>❌</i><div><h4>Đã huỷ</h4><b>{kpi[5] || 0}</b></div></div>
       </div>
 
-      {/* Toolbar lọc/sắp xếp */}
       <FilterBar
         q={q}
         setQ={setQ}
-        onReset={() => {
-          setQ(""); setStatusTab("all"); setSort({ key: "created_at", dir: "desc" }); setPage(1);
-        }}
+        onReset={() => { setQ(""); setStatusTab("all"); setSort({ key: "created_at", dir: "desc" }); setPage(1); }}
       >
         <div className="quick-status">
           {TAB_OPTIONS.map((t) => (
-            <button
-              key={t.k}
-              className={`chip ${String(statusTab) === String(t.k) ? "active" : ""}`}
-              type="button"
-              onClick={() => { setStatusTab(t.k); setPage(1); }}
-            >
+            <button key={t.k} className={`chip ${String(statusTab) === String(t.k) ? "active" : ""}`} type="button" onClick={() => { setStatusTab(t.k); setPage(1); }}>
               {t.label}
             </button>
           ))}
         </div>
 
-        <select
-          className="u-input"
-          value={`${sort.key}:${sort.dir}`}
-          onChange={(e) => {
-            const [k, d] = e.target.value.split(":");
-            setSort({ key: k, dir: d });
-          }}
-        >
+        <select className="u-input" value={`${sort.key}:${sort.dir}`} onChange={(e) => {
+          const [k, d] = e.target.value.split(":"); setSort({ key: k, dir: d });
+        }}>
           <option value="created_at:desc">Mới nhất</option>
           <option value="created_at:asc">Cũ nhất</option>
           <option value="total:desc">Tổng cao → thấp</option>
@@ -369,7 +299,6 @@ export default function Orders() {
         </select>
       </FilterBar>
 
-      {/* Bảng */}
       <div className="table-wrap u-hover">
         <table>
           <thead>
@@ -384,36 +313,22 @@ export default function Orders() {
             </tr>
           </thead>
           <tbody>
-            {loading &&
-              Array.from({ length: 6 }).map((_, i) => (
-                <tr key={i}>
-                  <td colSpan={7}><Skeleton h={44} r={8} /></td>
-                </tr>
-              ))}
+            {loading && Array.from({ length: 6 }).map((_, i) => (
+              <tr key={i}><td colSpan={7}><Skeleton h={44} r={8} /></td></tr>
+            ))}
 
             {!loading && pageItems.map((o) => (
               <tr key={o.id}>
                 <td>#{o.id}</td>
                 <td style={{ fontWeight: 600 }}>{o.name || "—"}</td>
-                <td style={{ color: "#aab3cf" }}>
-                  {o.email || ""}{o.email && o.phone ? " · " : ""}{o.phone || ""}
-                </td>
-                <td style={{ textAlign: "right", fontWeight: 700 }}>
-                  {VND.format(Number(o.total || 0))}₫
-                </td>
+                <td style={{ color: "#aab3cf" }}>{o.email || ""}{o.email && o.phone ? " · " : ""}{o.phone || ""}</td>
+                <td style={{ textAlign: "right", fontWeight: 700 }}>{VND.format(Number(o.total || 0))}₫</td>
                 <td><StatusBadge s={o.status} /></td>
-                <td>
-                  <span className="u-chip">{String(o.created_at).slice(0, 19).replace("T", " ")}</span>
-                </td>
+                <td><span className="u-chip">{String(o.created_at).slice(0, 19).replace("T", " ")}</span></td>
                 <td className="actions">
                   <Button variant="outline" onClick={() => openDetail(o)} className="btn-sm">Chi tiết</Button>
-                  <select
-                    className="status-select"
-                    title="Đổi trạng thái"
-                    value={o.status}
-                    disabled={pendingId === o.id}
-                    onChange={(e) => updateStatus(o.id, e.target.value)}
-                  >
+                  <select className="status-select" title="Đổi trạng thái" value={o.status} disabled={pendingId === o.id}
+                          onChange={(e) => updateStatus(o.id, e.target.value)}>
                     <option value="0">{LABEL_BY_STATUS[0]}</option>
                     <option value="1">{LABEL_BY_STATUS[1]}</option>
                     <option value="2">{LABEL_BY_STATUS[2]}</option>
@@ -426,17 +341,12 @@ export default function Orders() {
             ))}
 
             {!loading && pageItems.length === 0 && (
-              <tr>
-                <td colSpan={7} style={{ textAlign: "center", padding: "36px 0", color: "#97a2c4" }}>
-                  Không có dữ liệu
-                </td>
-              </tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", padding: "36px 0", color: "#97a2c4" }}>Không có dữ liệu</td></tr>
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
       <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "flex-end" }}>
         <span style={{ opacity: 0.7 }}>Trang {page}/{totalPages}</span>
         <Button variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} className="btn-sm">Trước</Button>
@@ -446,7 +356,6 @@ export default function Orders() {
         </select>
       </div>
 
-      {/* Modal chi tiết */}
       <Modal open={!!sel} onClose={() => setSel(null)} title={`Đơn #${sel?.id || ""}`}>
         {sel && (
           <div className="u-grid" style={{ gap: 10 }}>

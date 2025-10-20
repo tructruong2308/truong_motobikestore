@@ -39,6 +39,7 @@ Route::middleware(['auth:sanctum'])->group(function () {
     Route::get ('/products/{id}/reviews/can', [ReviewController::class, 'can']);
     Route::post('/products/{id}/reviews',     [ReviewController::class, 'store']);
     Route::put ('/reviews/{id}',              [ReviewController::class, 'update']);
+     Route::post('/reviews/{id}/images',       [ReviewController::class, 'uploadImages']);
 
     // Checkout: chỉ 1 route, qua PaymentController
     Route::post('/checkout', [PaymentController::class, 'checkout']);
