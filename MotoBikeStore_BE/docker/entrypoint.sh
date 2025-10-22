@@ -12,7 +12,7 @@ if [[ -n "${DB_HOST:-}" ]]; then
   for i in {1..30}; do
     php -r 'try{$pdo=new PDO("mysql:host=".getenv("DB_HOST").";port=".getenv("DB_PORT").";dbname=".getenv("DB_DATABASE"),
                              getenv("DB_USERNAME"),getenv("DB_PASSWORD"));exit(0);}catch(Exception $e){exit(1);}'; \
-    && break || sleep 2
+  break || sleep 2
   done || true
   php artisan migrate --force || true
 fi
