@@ -1,27 +1,36 @@
 <?php
 
 return [
+    // Chỉ áp dụng CORS cho các endpoint cần thiết
+    'paths' => [
+        'api/*',
+        'broadcasting/auth',
+        'sanctum/csrf-cookie', // nếu không dùng Sanctum có thể bỏ dòng này
+    ],
 
-    /*
-    |--------------------------------------------------------------------------
-    | Laravel CORS Configuration
-    |--------------------------------------------------------------------------
-    */
+    // Method cho phép
+    'allowed_methods' => ['*'],
 
-    'paths' => ['*'],   // Cho phép tất cả endpoint
+    // CHỈ cho phép origin FE của bạn (thêm domain khác nếu có)
+    'allowed_origins' => [
+        'https://truong-motobikestore.vercel.app',
+        // 'https://web.yourdomain.com', // (tuỳ chọn) domain FE riêng
+    ],
 
-    'allowed_methods' => ['*'],   // Cho phép tất cả method (GET, POST, PUT, DELETE)
+    // Nếu muốn cho phép theo pattern subdomain, dùng cái này thay vì allowed_origins
+    'allowed_origins_patterns' => [
+        // '#^https://(.*\.)?yourdomain\.com$#',
+    ],
 
-    'allowed_origins' => ['*'],   // Cho phép tất cả domain (FE, mobile app...)
+    // Header cho phép
+    'allowed_headers' => ['*'],
 
-    'allowed_origins_patterns' => [],
-
-    'allowed_headers' => ['*'],   // Cho phép tất cả header
-    
+    // Header muốn “lộ” ra cho JS (thường để trống)
     'exposed_headers' => [],
 
-    'max_age' => 0,
+    // Cache preflight (giây)
+    'max_age' => 86400,
 
+    // Dùng Bearer token => false; nếu dùng cookie (Sanctum) hãy đổi thành true và KHÔNG dùng '*'
     'supports_credentials' => false,
-
 ];
