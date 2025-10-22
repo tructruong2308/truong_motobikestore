@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
 
-const API = "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
 const PLACEHOLDER = "https://placehold.co/72x72?text=Img";
 const VND = new Intl.NumberFormat("vi-VN");
 
