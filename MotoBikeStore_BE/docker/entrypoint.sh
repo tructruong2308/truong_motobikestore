@@ -23,4 +23,4 @@ php artisan view:cache  || true
 # QUAN TRỌNG: chạy ở foreground và nghe đúng $PORT
 PORT="${PORT:-8080}"
 echo "✅ Starting PHP on 0.0.0.0:${PORT}"
-exec php -d variables_order=EGPCS -S 0.0.0.0:"${PORT}" -t public
+exec php -d variables_order=EGPCS -S 0.0.0.0:${PORT} -t public
