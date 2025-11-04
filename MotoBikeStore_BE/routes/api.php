@@ -11,6 +11,11 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CouponController;
 
+
+Route::options('/{any}', fn() => response()->noContent())
+    ->where('any', '.*');
+
+
 /* ---------- PUBLIC ---------- */
 Route::post('/register',        [AuthController::class, 'register']);
 Route::post('/login',           [AuthController::class, 'login']);
