@@ -30,6 +30,9 @@ Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
 
 // Coupons: kiểm tra áp dụng
     Route::post('/coupons/validate', [CouponController::class, 'validateCode']);
+//danh sách voucher
+    Route::get('/coupons/claimable', [CouponController::class, 'claimable']);
+
 
 /* ---------- CUSTOMER (Sanctum) ---------- */
 Route::middleware(['auth:sanctum'])->group(function () {

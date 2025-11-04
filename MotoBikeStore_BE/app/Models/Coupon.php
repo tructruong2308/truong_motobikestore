@@ -10,10 +10,14 @@ class Coupon extends Model
     protected $fillable = [
         'code','type','value','min_order','max_discount',
         'usage_limit','per_user_limit','starts_at','ends_at','is_active',
+        // NEW
+        'is_visible','channels','audience','badge_text',
     ];
 
     protected $casts = [
         'is_active'       => 'boolean',
+        'is_visible'      => 'boolean',     // NEW
+        'channels'        => 'array',       // NEW
         'starts_at'       => 'datetime',
         'ends_at'         => 'datetime',
         'min_order'       => 'integer',
@@ -47,6 +51,18 @@ class Coupon extends Model
     public function isWithinTime(): bool
     {
         return $this->isActiveNow();
+    }
+
+    /** NEW: scope lấy danh sách “hiển thị được” theo kênh */
+    public function scopeVisible($q, string $channel = 'web')
+    {
+        return $q->where('is_active', 1)
+                 ->where('is_visible', 1)
+                 ->when($channel, fn($w)=>$w->where(function($x) use($channel){
+                     $x->whereNull('channels')->orWhereJsonContains('channels', $channel);
+                 }))
+                 ->where(function($x){ $x->whereNull('starts_at')->orWhere('starts_at','<=', now()); })
+                 ->where(function($x){ $x->whereNull('ends_at')->orWhere('ends_at','>=', now()); });
     }
 
     /** Lượt còn lại toàn hệ thống; null = không giới hạn */

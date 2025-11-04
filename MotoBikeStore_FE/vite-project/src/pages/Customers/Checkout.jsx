@@ -16,6 +16,108 @@ const loadAddresses = () => {
 };
 const saveAddresses = (list) => localStorage.setItem(LS_ADDR, JSON.stringify(list));
 
+/* ====== NEW: Voucher Drawer (nội tuyến, không phụ thuộc lib) ====== */
+function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
+  const [loading, setLoading] = useState(false);
+  const [list, setList] = useState([]);
+  const [best, setBest] = useState(null);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      setErr(""); setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${Math.round(subtotal) || 0}`, {
+          headers: { Accept: "application/json" }
+        });
+        const data = await res.json();
+        setList(Array.isArray(data?.coupons) ? data.coupons : []);
+        setBest(data?.best || null);
+      } catch (e) {
+        setErr("Không tải được danh sách voucher.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [open, subtotal]);
+
+  if (!open) return null;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000,
+      display: "flex", justifyContent: "flex-end"
+    }}>
+      <div style={{ width: "100%", maxWidth: 420, height: "100%", background: "#0b1220", color: "#e2e8f0",
+        borderLeft: "1px solid rgba(148,163,184,.2)", display: "flex", flexDirection: "column" }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 14px", borderBottom: "1px solid rgba(148,163,184,.2)", background: "rgba(2,6,23,.35)"
+        }}>
+          <b>Chọn mã giảm giá</b>
+          <button className="btn" onClick={onClose}>Đóng</button>
+        </div>
+
+        <div style={{ padding: 14, overflowY: "auto", flex: 1 }}>
+          {loading && <div className="tag">Đang tải voucher…</div>}
+          {err && <div className="tag warn">{err}</div>}
+
+          {best?.estimate_discount > 0 && (
+            <button
+              className="btn primary"
+              style={{ width: "100%", marginBottom: 12 }}
+              onClick={() => onPickCode(best.code)}
+            >
+              Áp dụng tốt nhất: {best.code} (−{VND.format(Math.round(best.estimate_discount))}₫)
+            </button>
+          )}
+
+          <div style={{ display: "grid", gap: 10 }}>
+            {/* Đủ điều kiện */}
+            {list.filter(x => x.eligible).map(v => (
+              <div key={v.code} className="card" style={{ borderColor: "rgba(16,185,129,.35)" }}>
+                <div className="card-bd" style={{ display: "grid", gap: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{v.code} {v.badge && <span className="tag" style={{ marginLeft: 8 }}>{v.badge}</span>}</div>
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        {v.label} • ĐH tối thiểu {VND.format(v.min_order)}₫
+                      </div>
+                    </div>
+                    <button className="btn" onClick={() => onPickCode(v.code)}>Áp dụng</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {/* Chưa đủ điều kiện */}
+            {list.some(x => !x.eligible) && <div className="muted" style={{ marginTop: 8 }}>Chưa đủ điều kiện</div>}
+            {list.filter(x => !x.eligible).map(v => (
+              <div key={v.code} className="card">
+                <div className="card-bd" style={{ display: "grid", gap: 6, opacity: .85 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                    <div>
+                      <div style={{ fontWeight: 800 }}>{v.code}</div>
+                      <div className="muted" style={{ fontSize: 13 }}>
+                        {v.label} • Thiếu {VND.format(Math.ceil(v.lack))}₫
+                      </div>
+                    </div>
+                    <button className="btn" disabled>Chưa đạt</button>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {!loading && list.length === 0 && (
+              <div className="muted">Hiện chưa có mã phù hợp để hiển thị.</div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Checkout({ cart = [], setCart }) {
   /* =================== STATE =================== */
   // danh sách id đã chọn từ trang Cart (nếu trống => thanh toán cả giỏ)
@@ -50,6 +152,10 @@ export default function Checkout({ cart = [], setCart }) {
   const [ship, setShip] = useState("standard"); // standard|fast|express
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
+
+  // ===== NEW: voucher drawer controls & gợi ý tốt nhất ngoài drawer =====
+  const [openVoucher, setOpenVoucher] = useState(false);
+  const [bestHint, setBestHint] = useState(null); // {code, estimate_discount}
 
   // hệ thống
   const [loading, setLoading] = useState(false);
@@ -173,8 +279,8 @@ export default function Checkout({ cart = [], setCart }) {
 
   /* =================== COUPON =================== */
   // GỌI API validate thay vì luật demo
-  const applyCoupon = async () => {
-    const code = (coupon || "").trim().toUpperCase();
+  const applyCoupon = async (forceCode) => {
+    const code = (forceCode ?? coupon ?? "").trim().toUpperCase();
     if (!code) { setAppliedCoupon(null); setMsg(""); return; }
 
     try {
@@ -202,7 +308,8 @@ export default function Checkout({ cart = [], setCart }) {
         desc: "Áp dụng từ máy chủ",
         discount_from_be: Number(data.discount || 0),
         be: data.data,
-    });
+      });
+      setCoupon(code);
       setMsg(`✅ Đã áp dụng ${code}: -${VND.format(Number(data.discount||0))}₫`);
     } catch {
       setAppliedCoupon(null);
@@ -213,7 +320,31 @@ export default function Checkout({ cart = [], setCart }) {
   const clearCoupon = () => {
     setAppliedCoupon(null);
     setCoupon("");
+    setBestHint(null);
   };
+
+  // ===== NEW: Gợi ý mã tốt nhất ngay khi vào trang (nếu có) =====
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        if (subTotal <= 0) { setBestHint(null); return; }
+        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${Math.round(subTotal) || 0}`, {
+          headers: { Accept: "application/json" }
+        });
+        const data = await res.json();
+        if (stop) return;
+        if (data?.best?.estimate_discount > 0) {
+          setBestHint({ code: data.best.code, off: Math.round(data.best.estimate_discount) });
+        } else {
+          setBestHint(null);
+        }
+      } catch {
+        setBestHint(null);
+      }
+    })();
+    return () => { stop = true; };
+  }, [subTotal]);
 
   /* =================== SUBMIT =================== */
   const submit = async () => {
@@ -364,6 +495,7 @@ export default function Checkout({ cart = [], setCart }) {
 .muted{color:#94a3b8}
 .input{min-width:240px}
 .coupon{display:flex;gap:8px;align-items:center}
+.hint{display:flex;gap:8px;align-items:center;margin-top:8px}
   `;
 
   return (
@@ -536,9 +668,20 @@ export default function Checkout({ cart = [], setCart }) {
                     onChange={(e) => setCoupon(e.target.value)}
                     style={{ flex: 1 }}
                   />
-                  <button className="btn" onClick={applyCoupon}>Áp dụng</button>
+                  <button className="btn" onClick={() => applyCoupon()}>Áp dụng</button>
+                  <button className="btn" onClick={() => setOpenVoucher(true)}>Chọn mã</button>
                   {appliedCoupon && <button className="btn" onClick={clearCoupon}>Huỷ mã</button>}
                 </div>
+
+                {/* NEW: gợi ý tốt nhất (nếu chưa áp mã) */}
+                {!appliedCoupon && bestHint?.off > 0 && (
+                  <div className="hint">
+                    <span className="tag">Gợi ý</span>
+                    <span>Mã <b>{bestHint.code}</b> có thể giảm <b>{VND.format(bestHint.off)}₫</b>.</span>
+                    <button className="btn" onClick={() => applyCoupon(bestHint.code)}>Áp dụng tốt nhất</button>
+                  </div>
+                )}
+
                 {appliedCoupon && (
                   <div style={{ marginTop: 8 }}>
                     <span className="tag">Đã áp dụng: <b>{appliedCoupon.code}</b> — {appliedCoupon.desc}</span>
@@ -585,6 +728,14 @@ export default function Checkout({ cart = [], setCart }) {
           </div>
         </div>
       </div>
+
+      {/* NEW: Drawer chọn mã */}
+      <VoucherDrawer
+        open={openVoucher}
+        onClose={() => setOpenVoucher(false)}
+        subtotal={subTotal}
+        onPickCode={(code) => { setOpenVoucher(false); applyCoupon(code); }}
+      />
     </div>
   );
 }

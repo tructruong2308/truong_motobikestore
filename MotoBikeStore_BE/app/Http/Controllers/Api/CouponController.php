@@ -37,10 +37,22 @@ class CouponController extends Controller
             'starts_at'       => ['nullable','date'],
             'ends_at'         => ['nullable','date','after_or_equal:starts_at'],
             'is_active'       => ['boolean'],
+
+            // NEW (hiển thị như Shopee):
+            'is_visible'      => ['sometimes','boolean'],
+            'channels'        => ['nullable','array'],
+            'channels.*'      => ['in:web,app'],
+            'audience'        => ['sometimes', Rule::in(['all','new_user_only','returning'])],
+            'badge_text'      => ['nullable','string','max:30'],
         ]);
 
         $data['code'] = strtoupper(trim($data['code']));
         $data['is_active'] = $data['is_active'] ?? true;
+        $data['is_visible'] = $data['is_visible'] ?? true;
+
+        if (isset($data['channels']) && is_array($data['channels']) && empty($data['channels'])) {
+            $data['channels'] = null; // rỗng = áp cho mọi kênh
+        }
 
         // parse theo timezone app (khớp FE)
         $tz = config('app.timezone', 'Asia/Ho_Chi_Minh');
@@ -66,9 +78,24 @@ class CouponController extends Controller
             'starts_at'       => ['nullable','date'],
             'ends_at'         => ['nullable','date','after_or_equal:starts_at'],
             'is_active'       => ['boolean'],
+
+            // NEW:
+            'is_visible'      => ['sometimes','boolean'],
+            'channels'        => ['nullable','array'],
+            'channels.*'      => ['in:web,app'],
+            'audience'        => ['sometimes', Rule::in(['all','new_user_only','returning'])],
+            'badge_text'      => ['nullable','string','max:30'],
         ]);
 
         if (isset($data['code'])) $data['code'] = strtoupper(trim($data['code']));
+        if (array_key_exists('is_visible', $data) && $data['is_visible'] === null) {
+            $data['is_visible'] = true;
+        }
+        if (array_key_exists('channels', $data)) {
+            if (is_array($data['channels']) && empty($data['channels'])) {
+                $data['channels'] = null;
+            }
+        }
 
         $tz = config('app.timezone', 'Asia/Ho_Chi_Minh');
         if (array_key_exists('starts_at', $data)) {
@@ -161,6 +188,60 @@ class CouponController extends Controller
             'valid'    => true,
             'discount' => (int) $discount,
             'data'     => $coupon,
+        ]);
+    }
+
+    /**
+     * GET /api/coupons/claimable?subtotal=1980000
+     * Trả về danh sách voucher hiển thị + mã tốt nhất (để nút “Áp dụng tốt nhất”)
+     */
+    public function claimable(Request $r)
+    {
+        $subtotal = (int) preg_replace('/\D+/', '', (string) $r->query('subtotal', '0')); // nhận "1.980.000đ"
+        $user = $r->user();
+
+        $q = Coupon::visible('web')->orderByDesc('starts_at');
+
+        // audience theo lịch sử đơn (nếu có quan hệ orders())
+        if ($user) {
+            $isNew = method_exists($user, 'orders') ? !$user->orders()->exists() : false;
+            $q->whereIn('audience', $isNew ? ['all','new_user_only'] : ['all','returning']);
+        } else {
+            $q->where('audience','all');
+        }
+
+        $coupons = $q->get(['id','code','type','value','min_order','max_discount','ends_at','badge_text']);
+
+        $list = $coupons->map(function($c) use($subtotal){
+            $eligible = $subtotal >= (int)$c->min_order;
+            $est = 0;
+            if ($eligible) {
+                $est = $c->type === 'percent'
+                    ? (int) floor($subtotal * ($c->value/100))
+                    : (int) $c->value;
+                if ($c->type === 'percent' && $c->max_discount) $est = min($est, (int)$c->max_discount);
+                $est = min($est, $subtotal);
+            }
+            return [
+                'id'        => $c->id,
+                'code'      => $c->code,
+                'badge'     => $c->badge_text,
+                'label'     => $c->type==='percent'
+                                ? "-{$c->value}%".($c->max_discount? " (tối đa ".number_format($c->max_discount)."đ)" : "")
+                                : "-".number_format($c->value)."đ",
+                'min_order' => (int)$c->min_order,
+                'eligible'  => $eligible,
+                'lack'      => $eligible ? 0 : max(0, (int)$c->min_order - $subtotal),
+                'estimate_discount' => $est,
+                'ends_at'   => optional($c->ends_at)->toIso8601String(),
+            ];
+        })->values();
+
+        $best = $list->sortByDesc('estimate_discount')->first();
+
+        return response()->json([
+            'coupons' => $list,
+            'best'    => $best,
         ]);
     }
 }
