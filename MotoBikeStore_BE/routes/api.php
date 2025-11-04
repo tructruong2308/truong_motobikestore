@@ -11,11 +11,6 @@ use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CouponController;
 
-
-Route::options('/{any}', fn() => response()->noContent())
-    ->where('any', '.*');
-
-
 /* ---------- PUBLIC ---------- */
 Route::post('/register',        [AuthController::class, 'register']);
 Route::post('/login',           [AuthController::class, 'login']);
@@ -35,7 +30,7 @@ Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
 
 // Coupons: kiểm tra áp dụng
     Route::post('/coupons/validate', [CouponController::class, 'validateCode']);
-//danh sách voucher
+//danh
     Route::get('/coupons/claimable', [CouponController::class, 'claimable']);
 
 
