@@ -1,4 +1,3 @@
-// src/realtime/RealtimeListener.jsx
 import { useEffect } from "react";
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
@@ -58,16 +57,18 @@ export default function RealtimeListener() {
 
       const label =
         payload?.status_label ||
-        ({0:"Chờ xác nhận",1:"Đã xác nhận",2:"Đang đóng gói",3:"Đang giao",4:"Đã giao",5:"Đã huỷ"}[
+        ({ 0: "Chờ xác nhận", 1: "Đã xác nhận", 2: "Đang đóng gói", 3: "Đang giao", 4: "Đã giao", 5: "Đã huỷ" }[
           Number(payload?.status)
         ] || "Cập nhật");
 
+      // Đẩy vào hệ thống thông báo (Bell sẽ đọc & phát âm)
       push({
         title: "Cập nhật đơn hàng",
         message: `Đơn #${o.id} đã chuyển sang "${label}".`,
         data: { id: o.id },
       });
 
+      // Cho Orders.jsx tự đồng bộ UI nếu đang mở
       window.dispatchEvent(new CustomEvent("order:status:updated", { detail: o }));
     };
 

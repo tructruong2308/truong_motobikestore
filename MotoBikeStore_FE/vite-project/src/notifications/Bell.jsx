@@ -1,5 +1,4 @@
-// src/components/Bell.jsx
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNotifications } from "../notifications/NotificationProvider";
 import { useNavigate, useLocation } from "react-router-dom";
 
@@ -53,7 +52,7 @@ export default function Bell() {
     return () => window.removeEventListener("notify:new", onNotify);
   }, [audioReady]);
 
-  // Click 1 thông báo -> set focus + điều hướng / phát event
+  // Click 1 thông báo -> focus đơn / điều hướng
   const openOrderFromNotice = (n) => {
     const id = n?.data?.id || n?.orderId || n?.id;
     if (!id) return;
@@ -65,12 +64,10 @@ export default function Bell() {
     setOpen(false);
 
     if (location.pathname === "/orders") {
-      // Đang ở /orders -> focus ngay, bấm nhiều lần vẫn chạy
       window.dispatchEvent(
         new CustomEvent("focus:order", { detail: { id: Number(id) } })
       );
     } else {
-      // Trang khác -> điều hướng tới /orders
       navigate(`/orders?focus=${id}#o${id}`);
     }
   };
