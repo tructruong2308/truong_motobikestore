@@ -140,7 +140,7 @@ export default function Checkout({ cart = [], setCart }) {
   const [ship, setShip] = useState("standard");
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
-  const [discountAmount, setDiscountAmount] = useState(0);  // ✅ số giảm lưu trực tiếp
+  const [discountAmount, setDiscountAmount] = useState(0);  // số giảm lưu trực tiếp
 
   // Drawer & gợi ý
   const [openVoucher, setOpenVoucher] = useState(false);
@@ -198,8 +198,11 @@ export default function Checkout({ cart = [], setCart }) {
 
   const shippingFee = useMemo(() => (ship === "fast" ? 25000 : ship === "express" ? 50000 : 0), [ship]);
 
-  // ✅ lấy trực tiếp từ state discountAmount; chặn vượt quá subtotal
-  const discount = useMemo(() => Math.min(toInt(discountAmount), subTotal), [discountAmount, subTotal]);
+  // ✅ LẤY TRỰC TIẾP từ appliedCoupon (fallback discountAmount); chặn vượt subtotal
+  const discount = useMemo(() => {
+    const d = toInt(appliedCoupon?.discount_from_be ?? discountAmount);
+    return Math.min(d, subTotal);
+  }, [appliedCoupon, discountAmount, subTotal]);
 
   const shipAfterCoupon = shippingFee; // chưa freeship
 
@@ -284,7 +287,7 @@ export default function Checkout({ cart = [], setCart }) {
         discount_from_be: off,
         be: data.data,
       });
-      setDiscountAmount(off); // ✅ lưu số giảm để dùng thẳng
+      setDiscountAmount(off);
       setCoupon(code);
       setMsg(`✅ Đã áp dụng ${code}: -${VND.format(off)}₫`);
     } catch {
@@ -296,7 +299,7 @@ export default function Checkout({ cart = [], setCart }) {
 
   const clearCoupon = () => {
     setAppliedCoupon(null);
-    setDiscountAmount(0);   // ✅ clear
+    setDiscountAmount(0);
     setCoupon("");
     setBestHint(null);
   };
