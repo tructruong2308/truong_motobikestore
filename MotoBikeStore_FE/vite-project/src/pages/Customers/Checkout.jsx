@@ -2,14 +2,14 @@
 import { useEffect, useMemo, useState } from "react";
 
 const VND = new Intl.NumberFormat("vi-VN");
-// ✅ dùng env khi build (HTTPS ở production), fallback local khi dev
+// Dùng env ở production, fallback localhost khi dev
 const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
-/* ====== Local helpers ====== */
+/* ===== Helpers ===== */
 const LS_ADDR = "customer_addresses";
 const LS_CHECKED = "checkout_selected_ids";
 
-// ✅ ép mọi giá trị tiền về số nguyên sạch (bỏ . , đ khoảng trắng)
+// Ép mọi giá trị tiền về số nguyên: bỏ ., đ, khoảng trắng...
 const toInt = (v) => {
   if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
   if (v == null) return 0;
@@ -26,7 +26,7 @@ const loadAddresses = () => {
 };
 const saveAddresses = (list) => localStorage.setItem(LS_ADDR, JSON.stringify(list));
 
-/* ====== Voucher Drawer ====== */
+/* ===== Voucher Drawer ===== */
 function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState([]);
@@ -112,8 +112,9 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
   );
 }
 
+/* ===== Checkout ===== */
 export default function Checkout({ cart = [], setCart }) {
-  /* =================== STATE =================== */
+  // Id các mục được chọn từ Cart
   const selectedIds = useMemo(() => {
     try {
       const arr = JSON.parse(localStorage.getItem(LS_CHECKED) || "[]");
@@ -126,24 +127,30 @@ export default function Checkout({ cart = [], setCart }) {
     [cart, selectedIds]
   );
 
+  // Thông tin khách
   const [form, setForm] = useState({
     customer_name: "", phone: "", email: "", address: "", note: "", payment_method: "cod",
   });
 
+  // Địa chỉ
   const [addresses, setAddresses] = useState(loadAddresses());
   const [addrIndex, setAddrIndex] = useState(-1);
 
+  // Vận chuyển & mã giảm
   const [ship, setShip] = useState("standard");
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
+  const [discountAmount, setDiscountAmount] = useState(0);  // ✅ số giảm lưu trực tiếp
 
+  // Drawer & gợi ý
   const [openVoucher, setOpenVoucher] = useState(false);
   const [bestHint, setBestHint] = useState(null); // {code, off}
 
+  // Hệ thống
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
-  /* =================== INIT USER =================== */
+  /* Init user */
   useEffect(() => {
     const uStr = localStorage.getItem("customer_user") || localStorage.getItem("user");
     if (uStr) {
@@ -177,12 +184,13 @@ export default function Checkout({ cart = [], setCart }) {
     }
   }, []);
 
+  // đồng bộ giỏ
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart || []));
     window.dispatchEvent(new Event("cart:refresh"));
   }, [cart]);
 
-  /* =================== TÍNH TIỀN =================== */
+  /* Tính tiền */
   const subTotal = useMemo(
     () => cartForCheckout.reduce((s, i) => s + (i.qty || 1) * toInt(i.price), 0),
     [cartForCheckout]
@@ -190,14 +198,10 @@ export default function Checkout({ cart = [], setCart }) {
 
   const shippingFee = useMemo(() => (ship === "fast" ? 25000 : ship === "express" ? 50000 : 0), [ship]);
 
-  // ✅ đảm bảo trừ đúng: ép số sạch và chặn > subtotal
-  const discount = useMemo(() => {
-    if (!appliedCoupon) return 0;
-    const d = toInt(appliedCoupon.discount_from_be);
-    return Math.min(d, subTotal);
-  }, [appliedCoupon, subTotal]);
+  // ✅ lấy trực tiếp từ state discountAmount; chặn vượt quá subtotal
+  const discount = useMemo(() => Math.min(toInt(discountAmount), subTotal), [discountAmount, subTotal]);
 
-  const shipAfterCoupon = shippingFee; // chưa hỗ trợ freeship
+  const shipAfterCoupon = shippingFee; // chưa freeship
 
   const grandTotal = useMemo(
     () => Math.max(0, subTotal - discount) + shipAfterCoupon,
@@ -210,7 +214,7 @@ export default function Checkout({ cart = [], setCart }) {
       ? "MoMo sandbox chỉ cho phép ≤ 50.000.000đ/giao dịch."
       : "Tổng thanh toán MoMo phải ≥ 1.000đ.";
 
-  /* =================== ĐỊA CHỈ =================== */
+  /* Địa chỉ */
   const pickSavedAddress = (i) => {
     setAddrIndex(i);
     if (i >= 0 && addresses[i]) {
@@ -246,10 +250,10 @@ export default function Checkout({ cart = [], setCart }) {
     alert("✅ Đã lưu địa chỉ mặc định.");
   };
 
-  /* =================== COUPON =================== */
+  /* Coupon */
   const applyCoupon = async (forceCode) => {
     const code = (forceCode ?? coupon ?? "").trim().toUpperCase();
-    if (!code) { setAppliedCoupon(null); setMsg(""); return; }
+    if (!code) { setAppliedCoupon(null); setDiscountAmount(0); setMsg(""); return; }
 
     try {
       setMsg("Đang kiểm tra mã…");
@@ -267,27 +271,37 @@ export default function Checkout({ cart = [], setCart }) {
 
       if (!res.ok || !data?.valid) {
         setAppliedCoupon(null);
+        setDiscountAmount(0);
         setMsg("❌ " + (data?.reason || "Mã không hợp lệ"));
         return;
       }
 
+      const off = toInt(data.discount);
+
       setAppliedCoupon({
         code,
         desc: "Áp dụng từ máy chủ",
-        discount_from_be: toInt(data.discount), // ✅ ép số sạch ngay tại đây
+        discount_from_be: off,
         be: data.data,
       });
+      setDiscountAmount(off); // ✅ lưu số giảm để dùng thẳng
       setCoupon(code);
-      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(toInt(data.discount))}₫`);
+      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(off)}₫`);
     } catch {
       setAppliedCoupon(null);
+      setDiscountAmount(0);
       setMsg("❌ Không kết nối được máy chủ");
     }
   };
 
-  const clearCoupon = () => { setAppliedCoupon(null); setCoupon(""); setBestHint(null); };
+  const clearCoupon = () => {
+    setAppliedCoupon(null);
+    setDiscountAmount(0);   // ✅ clear
+    setCoupon("");
+    setBestHint(null);
+  };
 
-  // Gợi ý mã tốt nhất theo subtotal
+  // Gợi ý mã tốt nhất
   useEffect(() => {
     let stop = false;
     (async () => {
@@ -306,7 +320,7 @@ export default function Checkout({ cart = [], setCart }) {
     return () => { stop = true; };
   }, [subTotal]);
 
-  /* =================== SUBMIT =================== */
+  /* Submit */
   const submit = async () => {
     setMsg("");
 
@@ -349,7 +363,7 @@ export default function Checkout({ cart = [], setCart }) {
       subtotal: toInt(subTotal),
       discount: toInt(discount),
       shipping_method: ship,
-      shipping_fee: toInt(shipAfterCoupon),
+      shipping_fee: toInt(shippingFee),
       total: toInt(grandTotal),
 
       items,
@@ -414,7 +428,7 @@ export default function Checkout({ cart = [], setCart }) {
     }
   };
 
-  /* =================== UI =================== */
+  /* UI */
   const css = `
 .co-shell{display:grid;grid-template-columns:1.5fr .9fr;gap:16px}
 @media (max-width: 1024px){.co-shell{grid-template-columns:1fr}}
@@ -451,16 +465,15 @@ export default function Checkout({ cart = [], setCart }) {
       <h1 style={{ margin: 0, marginBottom: 8 }}>Thanh toán</h1>
 
       <div className="co-shell">
-        {/* ========== Cột trái ========== */}
+        {/* Cột trái */}
         <div style={{ display: "grid", gap: 12 }}>
-          {/* Địa chỉ nhận hàng */}
+          {/* Địa chỉ */}
           <div className="card">
             <div className="card-hd">
               <b>Địa chỉ nhận hàng</b>
               <span className="tag">Bắt buộc</span>
             </div>
             <div className="card-bd addr-grid">
-              {/* Chọn nhanh địa chỉ đã lưu */}
               <div className="row between">
                 <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <select
@@ -530,9 +543,9 @@ export default function Checkout({ cart = [], setCart }) {
           </div>
         </div>
 
-        {/* ========== Cột phải ========== */}
+        {/* Cột phải */}
         <div style={{ display: "grid", gap: 12 }}>
-          {/* Thanh toán & vận chuyển */}
+          {/* Thanh toán & Vận chuyển */}
           <div className="card">
             <div className="card-hd"><b>Thanh toán & Vận chuyển</b></div>
             <div className="card-bd" style={{ display: "grid", gap: 14 }}>
@@ -609,7 +622,7 @@ export default function Checkout({ cart = [], setCart }) {
             <div className="card-bd sum">
               <div className="r"><span>Tạm tính</span><span>{VND.format(subTotal)}₫</span></div>
               <div className="r"><span>Giảm giá</span><span>-{VND.format(discount)}₫</span></div>
-              <div className="r"><span>Phí vận chuyển</span><span>{VND.format(shipAfterCoupon)}₫</span></div>
+              <div className="r"><span>Phí vận chuyển</span><span>{VND.format(shippingFee)}₫</span></div>
               <div className="line" />
               <div className="r"><span>Tổng thanh toán</span><span className="total">{VND.format(grandTotal)}₫</span></div>
             </div>
