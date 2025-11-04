@@ -2,13 +2,14 @@
 import { useEffect, useMemo, useState } from "react";
 
 const VND = new Intl.NumberFormat("vi-VN");
-const API_BASE = "http://127.0.0.1:8000/api";
+const API_BASE = import.meta.env?.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
 /* ====== Local helpers ====== */
-const LS_ADDR = "customer_addresses";
+const LS_ADDR    = "customer_addresses";
 const LS_CHECKED = "checkout_selected_ids";
+const LS_COUPON  = "checkout_applied_coupon";
 
-// Ép mọi giá trị tiền về số nguyên sạch (bỏ ., đ, khoảng trắng…)
+// ép tiền về số nguyên an toàn
 const toInt = (v) => {
   if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
   if (v == null) return 0;
@@ -18,14 +19,15 @@ const toInt = (v) => {
 };
 
 const loadAddresses = () => {
-  try {
-    const arr = JSON.parse(localStorage.getItem(LS_ADDR) || "[]");
-    return Array.isArray(arr) ? arr : [];
-  } catch { return []; }
+  try { const arr = JSON.parse(localStorage.getItem(LS_ADDR) || "[]"); return Array.isArray(arr) ? arr : []; }
+  catch { return []; }
 };
-const saveAddresses = (list) => localStorage.setItem(LS_ADDR, JSON.stringify(list));
+const saveAddresses   = (list) => localStorage.setItem(LS_ADDR, JSON.stringify(list));
+const saveAppliedCoupon = (obj) => localStorage.setItem(LS_COUPON, JSON.stringify(obj || null));
+const loadAppliedCoupon = () => { try { return JSON.parse(localStorage.getItem(LS_COUPON) || "null"); } catch { return null; } };
+const clearSavedCoupon  = () => localStorage.removeItem(LS_COUPON);
 
-/* ====== Drawer hiện mã giảm giá ====== */
+/* ====== Voucher Drawer (inline component) ====== */
 function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState([]);
@@ -40,7 +42,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
         const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${toInt(subtotal)}`, {
           headers: { Accept: "application/json" }
         });
-        const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(()=> ({}));
         setList(Array.isArray(data?.coupons) ? data.coupons : []);
         setBest(data?.best || null);
       } catch {
@@ -52,6 +54,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
   }, [open, subtotal]);
 
   if (!open) return null;
+
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
       <div style={{ width: "100%", maxWidth: 420, height: "100%", background: "#0b1220", color: "#e2e8f0",
@@ -74,7 +77,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
           )}
 
           <div style={{ display: "grid", gap: 10 }}>
-            {/* Voucher đủ điều kiện */}
+            {/* Đủ điều kiện */}
             {list.filter(x => x.eligible).map(v => (
               <div key={v.code} className="card" style={{ borderColor: "rgba(16,185,129,.35)" }}>
                 <div className="card-bd" style={{ display: "grid", gap: 6 }}>
@@ -93,7 +96,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
               </div>
             ))}
 
-            {/* Voucher chưa đủ điều kiện */}
+            {/* Chưa đủ điều kiện */}
             {list.some(x => !x.eligible) && <div className="muted" style={{ marginTop: 8 }}>Chưa đủ điều kiện</div>}
             {list.filter(x => !x.eligible).map(v => (
               <div key={v.code} className="card">
@@ -111,9 +114,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
               </div>
             ))}
 
-            {!loading && list.length === 0 && (
-              <div className="muted">Hiện chưa có mã phù hợp để hiển thị.</div>
-            )}
+            {!loading && list.length === 0 && (<div className="muted">Hiện chưa có mã phù hợp để hiển thị.</div>)}
           </div>
         </div>
       </div>
@@ -124,10 +125,8 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
 export default function Checkout({ cart = [], setCart }) {
   /* =================== STATE =================== */
   const selectedIds = useMemo(() => {
-    try {
-      const arr = JSON.parse(localStorage.getItem(LS_CHECKED) || "[]");
-      return new Set(arr.map(String));
-    } catch { return new Set(); }
+    try { const arr = JSON.parse(localStorage.getItem(LS_CHECKED) || "[]"); return new Set(arr.map(String)); }
+    catch { return new Set(); }
   }, []);
 
   const cartForCheckout = useMemo(
@@ -135,25 +134,23 @@ export default function Checkout({ cart = [], setCart }) {
     [cart, selectedIds]
   );
 
+  // user & form
   const [form, setForm] = useState({
-    customer_name: "",
-    phone: "",
-    email: "",
-    address: "",
-    note: "",
-    payment_method: "cod",
+    customer_name: "", phone: "", email: "", address: "", note: "", payment_method: "cod",
   });
 
+  // địa chỉ & ship & coupon
   const [addresses, setAddresses] = useState(loadAddresses());
   const [addrIndex, setAddrIndex] = useState(-1);
-
   const [ship, setShip] = useState("standard");
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
 
-  // Drawer mã giảm giá
+  // drawer + gợi ý tốt nhất
   const [openVoucher, setOpenVoucher] = useState(false);
+  const [bestHint, setBestHint] = useState(null); // {code, off}
 
+  // hệ thống
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -191,6 +188,7 @@ export default function Checkout({ cart = [], setCart }) {
     }
   }, []);
 
+  // đồng bộ giỏ
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart || []));
     window.dispatchEvent(new Event("cart:refresh"));
@@ -198,22 +196,19 @@ export default function Checkout({ cart = [], setCart }) {
 
   /* =================== TÍNH TIỀN =================== */
   const subTotal = useMemo(
-    () => cartForCheckout.reduce((s, i) => s + toInt(i.qty || 1) * toInt(i.price || 0), 0),
+    () => cartForCheckout.reduce((s, i) => s + (toInt(i.qty) || 1) * toInt(i.price), 0),
     [cartForCheckout]
   );
 
-  const shippingFee = useMemo(() => {
-    switch (ship) {
-      case "fast": return 25000;
-      case "express": return 50000;
-      default: return 0;
-    }
-  }, [ship]);
+  const shippingFee = useMemo(() => (ship === "fast" ? 25000 : ship === "express" ? 50000 : 0), [ship]);
 
-  // Giảm giá (tính trực tiếp để tránh kẹt state)
-  const discount = Math.min(toInt(appliedCoupon?.discount_from_be), subTotal);
+  const discount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    const d = toInt(appliedCoupon.discount_from_be);
+    return Math.min(d, subTotal);
+  }, [appliedCoupon, subTotal]);
 
-  const shipAfterCoupon = shippingFee;
+  const shipAfterCoupon = shippingFee; // chưa hỗ trợ freeship
   const grandTotal = useMemo(
     () => Math.max(0, subTotal - discount) + shipAfterCoupon,
     [subTotal, discount, shipAfterCoupon]
@@ -262,49 +257,114 @@ export default function Checkout({ cart = [], setCart }) {
   };
 
   /* =================== COUPON =================== */
-  const applyCoupon = async (forceCode) => {
-    const code = (forceCode ?? coupon ?? "").trim().toUpperCase();
-    if (!code) { setAppliedCoupon(null); setMsg(""); return; }
+  // gọi BE validate (tái sử dụng cho tự động re-validate)
+  const validateCoupon = async (code, currentSubtotal) => {
+    const cleanCode = String(code || "").trim().toUpperCase();
+    if (!cleanCode) throw new Error("EMPTY");
+    const token = localStorage.getItem("customer_token") || localStorage.getItem("token");
+    const res = await fetch(`${API_BASE}/coupons/validate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ code: cleanCode, subtotal: toInt(currentSubtotal) }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data?.valid) {
+      const reason = data?.reason || "Mã không hợp lệ";
+      const err = new Error(reason);
+      err.code = "INVALID";
+      throw err;
+    }
+    return {
+      code: cleanCode,
+      desc: "Áp dụng từ máy chủ",
+      discount_from_be: toInt(data.discount || 0),
+      be: data.data,
+    };
+  };
 
+  // người dùng nhập tay
+  const applyCoupon = async () => {
+    const code = (coupon || "").trim().toUpperCase();
+    if (!code) { setAppliedCoupon(null); clearSavedCoupon(); setMsg(""); return; }
     try {
       setMsg("Đang kiểm tra mã…");
-      const token = localStorage.getItem("customer_token") || localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/coupons/validate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ code, subtotal: toInt(subTotal) }),
-      });
-      const data = await res.json().catch(()=> ({}));
-
-      if (!res.ok || !data?.valid) {
-        setAppliedCoupon(null);
-        setMsg("❌ " + (data?.reason || "Mã không hợp lệ"));
-        return;
-      }
-
-      const off = toInt(data.discount);
-      setAppliedCoupon({
-        code,
-        desc: "Áp dụng từ máy chủ",
-        discount_from_be: off,
-        be: data.data,
-      });
-      setCoupon(code);
-      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(off)}₫`);
-    } catch {
+      const result = await validateCoupon(code, subTotal);
+      setAppliedCoupon(result);
+      saveAppliedCoupon(result);
+      setMsg(`✅ Đã áp dụng ${result.code}: -${VND.format(result.discount_from_be)}₫`);
+    } catch (e) {
       setAppliedCoupon(null);
-      setMsg("❌ Không kết nối được máy chủ");
+      clearSavedCoupon();
+      setMsg("❌ " + (e?.message || "Mã không hợp lệ"));
+    }
+  };
+
+  // khi chọn từ Drawer
+  const applyCouponFromDrawer = async (code) => {
+    setOpenVoucher(false);
+    setCoupon(code);
+    try {
+      setMsg("Đang kiểm tra mã…");
+      const result = await validateCoupon(code, subTotal);
+      setAppliedCoupon(result);
+      saveAppliedCoupon(result);
+      setMsg(`✅ Đã áp dụng ${result.code}: -${VND.format(result.discount_from_be)}₫`);
+    } catch (e) {
+      setAppliedCoupon(null);
+      clearSavedCoupon();
+      setMsg("❌ " + (e?.message || "Mã không hợp lệ"));
     }
   };
 
   const clearCoupon = () => {
     setAppliedCoupon(null);
     setCoupon("");
+    clearSavedCoupon();
+    setMsg("Đã huỷ mã giảm giá.");
   };
+
+  // F5 tự áp lại mã
+  useEffect(() => {
+    const saved = loadAppliedCoupon();
+    if (!saved?.code) return;
+    setCoupon(saved.code);
+    validateCoupon(saved.code, subTotal)
+      .then((r) => { setAppliedCoupon(r); saveAppliedCoupon(r); })
+      .catch(() => { setAppliedCoupon(null); clearSavedCoupon(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // subtotal thay đổi → re-validate
+  useEffect(() => {
+    if (!appliedCoupon?.code) return;
+    validateCoupon(appliedCoupon.code, subTotal)
+      .then((r) => { setAppliedCoupon(r); saveAppliedCoupon(r); })
+      .catch(() => { setAppliedCoupon(null); clearSavedCoupon(); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTotal]);
+
+  // Gợi ý mã tốt nhất (ngoài Drawer)
+  useEffect(() => {
+    let stop = false;
+    (async () => {
+      try {
+        if (subTotal <= 0) { setBestHint(null); return; }
+        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${toInt(subTotal)}`, {
+          headers: { Accept: "application/json" }
+        });
+        const data = await res.json().catch(()=> ({}));
+        if (stop) return;
+        if (data?.best?.estimate_discount > 0) {
+          setBestHint({ code: data.best.code, off: Math.round(data.best.estimate_discount) });
+        } else setBestHint(null);
+      } catch { setBestHint(null); }
+    })();
+    return () => { stop = true; };
+  }, [subTotal]);
 
   /* =================== SUBMIT =================== */
   const submit = async () => {
@@ -326,42 +386,17 @@ export default function Checkout({ cart = [], setCart }) {
     const items = cartForCheckout.map((i) => {
       const q = toInt(i.qty || 1);
       const p = toInt(i.price || 0);
-      return {
-        id: i.id,
-        product_id: i.id,
-        name: i.name,
-        thumbnail: i.thumbnail_url || null,
-        qty: q,
-        quantity: q,
-        price: p,
-        unit_price: p,
-        total: q * p,
-      };
+      return { id: i.id, product_id: i.id, name: i.name, thumbnail: i.thumbnail_url || null,
+        qty: q, quantity: q, price: p, unit_price: p, total: q * p };
     });
 
     const payload = {
-      name: form.customer_name,
-      phone: form.phone,
-      email: form.email || null,
-      address: form.address,
-      note: form.note || null,
-
-      subtotal: Math.round(subTotal) || 0,
-      discount: Math.round(discount) || 0,
-      shipping_method: ship,
-      shipping_fee: Math.round(shipAfterCoupon) || 0,
-      total: Math.round(grandTotal) || 0,
-
-      items,
-      order_details: items,
-
-      customer_name: form.customer_name,
-      customer_phone: form.phone,
-      customer_email: form.email || null,
-      customer_address: form.address,
-      customer_note: form.note || null,
-      customer_total: Math.round(grandTotal) || 0,
-
+      name: form.customer_name, phone: form.phone, email: form.email || null, address: form.address, note: form.note || null,
+      subtotal: toInt(subTotal), discount: toInt(discount), shipping_method: ship,
+      shipping_fee: toInt(shipAfterCoupon), total: toInt(grandTotal),
+      items, order_details: items,
+      customer_name: form.customer_name, customer_phone: form.phone, customer_email: form.email || null,
+      customer_address: form.address, customer_note: form.note || null, customer_total: toInt(grandTotal),
       payment_method: form.payment_method,
       coupon_code: appliedCoupon?.code || null,
     };
@@ -369,28 +404,18 @@ export default function Checkout({ cart = [], setCart }) {
     try {
       setLoading(true);
       const token = localStorage.getItem("customer_token") || localStorage.getItem("token");
-
       const res = await fetch(`${API_BASE}/checkout`, {
         method: "POST",
-        headers: {
-          Accept: "application/json",
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { Accept: "application/json", "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         body: JSON.stringify(payload),
       });
 
       let data = {};
       try { data = await res.json(); } catch {}
 
-      if (res.status === 401) {
-        setMsg("Bạn chưa đăng nhập hoặc phiên đã hết hạn. Vui lòng đăng nhập lại.");
-        return;
-      }
+      if (res.status === 401) { setMsg("Bạn chưa đăng nhập hoặc phiên đã hết hạn. Vui lòng đăng nhập lại."); return; }
       if (!res.ok || data?.success === false) {
-        const details = data?.errors
-          ? Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ")
-          : null;
+        const details = data?.errors ? Object.entries(data.errors).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(", ") : v}`).join(" | ") : null;
         throw new Error(data?.message || details || `HTTP ${res.status}`);
       }
 
@@ -400,15 +425,14 @@ export default function Checkout({ cart = [], setCart }) {
         return;
       }
 
-      const nextCart =
-        selectedIds.size === 0
-          ? []
-          : cart.filter((x) => !selectedIds.has(String(x.id)));
-
+      const nextCart = selectedIds.size === 0 ? [] : cart.filter((x) => !selectedIds.has(String(x.id)));
       setCart(nextCart);
       localStorage.setItem("cart", JSON.stringify(nextCart));
       localStorage.removeItem(LS_CHECKED);
       window.dispatchEvent(new Event("cart:refresh"));
+
+      // clear coupon sau khi đặt thành công (tuỳ policy)
+      clearCoupon();
 
       setMsg("✅ Đặt hàng thành công!");
     } catch (e) {
@@ -446,6 +470,7 @@ export default function Checkout({ cart = [], setCart }) {
 .muted{color:#94a3b8}
 .input{min-width:240px}
 .coupon{display:flex;gap:8px;align-items:center}
+.hint{display:flex;gap:8px;align-items:center;margin-top:8px}
   `;
 
   return (
@@ -485,33 +510,16 @@ export default function Checkout({ cart = [], setCart }) {
               </div>
 
               <div className="row">
-                <input
-                  className="u-input input"
-                  placeholder="Họ tên"
-                  value={form.customer_name}
-                  onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-                />
-                <input
-                  className="u-input input"
-                  placeholder="Số điện thoại"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
+                <input className="u-input input" placeholder="Họ tên"
+                  value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })}/>
+                <input className="u-input input" placeholder="Số điện thoại"
+                  value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}/>
               </div>
-              <input
-                className="u-input"
-                placeholder="Địa chỉ"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-              />
+              <input className="u-input" placeholder="Địa chỉ"
+                value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}/>
               <div className="row">
-                <input
-                  className="u-input input"
-                  placeholder="Email (tuỳ chọn)"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
+                <input className="u-input input" placeholder="Email (tuỳ chọn)" type="email"
+                  value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}/>
                 <span className="tag">Thông báo đơn hàng sẽ gửi qua email (nếu có)</span>
               </div>
             </div>
@@ -533,12 +541,9 @@ export default function Checkout({ cart = [], setCart }) {
                 const price = toInt(i.price || 0);
                 return (
                   <div className="item" key={i.id}>
-                    <img
-                      className="thumb"
+                    <img className="thumb"
                       src={i.thumbnail_url || "https://placehold.co/64x64?text=No+Img"}
-                      onError={(e) =>
-                        (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")
-                      }
+                      onError={(e) => (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")}
                     />
                     <div>
                       <div className="name">{i.name}</div>
@@ -548,9 +553,7 @@ export default function Checkout({ cart = [], setCart }) {
                   </div>
                 );
               })}
-              {!cartForCheckout.length && (
-                <div className="muted">Chưa có sản phẩm nào. Hãy quay lại giỏ hàng nhé.</div>
-              )}
+              {!cartForCheckout.length && <div className="muted">Chưa có sản phẩm nào. Hãy quay lại giỏ hàng nhé.</div>}
             </div>
           </div>
         </div>
@@ -565,22 +568,13 @@ export default function Checkout({ cart = [], setCart }) {
                 <b>Phương thức thanh toán</b>
                 <div className="pm-row">
                   <label>
-                    <input
-                      type="radio"
-                      name="pm"
-                      checked={form.payment_method === "cod"}
-                      onChange={() => setForm({ ...form, payment_method: "cod" })}
-                    />{" "}
+                    <input type="radio" name="pm" checked={form.payment_method === "cod"}
+                      onChange={() => setForm({ ...form, payment_method: "cod" })}/> {" "}
                     Thanh toán khi nhận hàng (COD)
                   </label>
                   <label title={momoDisabled ? momoReason : ""} style={{ opacity: momoDisabled ? 0.7 : 1 }}>
-                    <input
-                      type="radio"
-                      name="pm"
-                      checked={form.payment_method === "momo"}
-                      onChange={() => setForm({ ...form, payment_method: "momo" })}
-                      disabled={momoDisabled}
-                    />{" "}
+                    <input type="radio" name="pm" checked={form.payment_method === "momo"}
+                      onChange={() => setForm({ ...form, payment_method: "momo" })} disabled={momoDisabled}/> {" "}
                     Ví MoMo / QR online {momoDisabled && <span className="tag warn">{momoReason}</span>}
                   </label>
                 </div>
@@ -591,18 +585,12 @@ export default function Checkout({ cart = [], setCart }) {
               <div>
                 <b>Chọn hình thức vận chuyển</b>
                 <div className="pm-row">
-                  <label>
-                    <input type="radio" name="ship" value="standard" checked={ship === "standard"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Tiêu chuẩn — {VND.format(0)}₫
-                  </label>
-                  <label>
-                    <input type="radio" name="ship" value="fast" checked={ship === "fast"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Nhanh — {VND.format(25000)}₫
-                  </label>
-                  <label>
-                    <input type="radio" name="ship" value="express" checked={ship === "express"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Hoả tốc — {VND.format(50000)}₫
-                  </label>
+                  <label><input type="radio" name="ship" value="standard" checked={ship === "standard"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Tiêu chuẩn — {VND.format(0)}₫</label>
+                  <label><input type="radio" name="ship" value="fast" checked={ship === "fast"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Nhanh — {VND.format(25000)}₫</label>
+                  <label><input type="radio" name="ship" value="express" checked={ship === "express"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Hoả tốc — {VND.format(50000)}₫</label>
                 </div>
               </div>
 
@@ -611,17 +599,22 @@ export default function Checkout({ cart = [], setCart }) {
               <div>
                 <b>Mã giảm giá</b>
                 <div className="coupon">
-                  <input
-                    className="u-input"
-                    placeholder="Nhập mã giảm giá"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
-                  <button className="btn" onClick={() => applyCoupon()}>Áp dụng</button>
+                  <input className="u-input" placeholder="Nhập mã giảm giá"
+                    value={coupon} onChange={(e) => setCoupon(e.target.value)} style={{ flex: 1 }}/>
+                  <button className="btn" onClick={applyCoupon}>Áp dụng</button>
                   <button className="btn" onClick={() => setOpenVoucher(true)}>Chọn mã</button>
                   {appliedCoupon && <button className="btn" onClick={clearCoupon}>Huỷ mã</button>}
                 </div>
+
+                {/* Gợi ý nhanh ngoài Drawer */}
+                {!appliedCoupon && bestHint?.off > 0 && (
+                  <div className="hint">
+                    <span className="tag">Gợi ý</span>
+                    <span>Mã <b>{bestHint.code}</b> có thể giảm <b>{VND.format(bestHint.off)}₫</b>.</span>
+                    <button className="btn" onClick={() => applyCouponFromDrawer(bestHint.code)}>Áp dụng tốt nhất</button>
+                  </div>
+                )}
+
                 {appliedCoupon && (
                   <div style={{ marginTop: 8 }}>
                     <span className="tag">Đã áp dụng: <b>{appliedCoupon.code}</b> — {appliedCoupon.desc}</span>
@@ -633,12 +626,8 @@ export default function Checkout({ cart = [], setCart }) {
 
               <div>
                 <b>Lời nhắn cho shop</b>
-                <textarea
-                  className="u-input note"
-                  placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi đến…"
-                  value={form.note}
-                  onChange={(e) => setForm({ ...form, note: e.target.value })}
-                />
+                <textarea className="u-input note" placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi đến…"
+                  value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}/>
               </div>
             </div>
           </div>
@@ -658,11 +647,7 @@ export default function Checkout({ cart = [], setCart }) {
           {/* Thanh xác nhận */}
           <div className="bar">
             {msg && <div className="tag" style={{ background: "rgba(6,78,59,.25)" }}>{msg}</div>}
-            <button
-              className="btn primary"
-              onClick={submit}
-              disabled={loading || !cartForCheckout.length}
-            >
+            <button className="btn primary" onClick={submit} disabled={loading || !cartForCheckout.length}>
               {loading ? "Đang xử lý…" : form.payment_method === "momo" ? "Thanh toán MoMo" : "Đặt hàng COD"}
             </button>
           </div>
@@ -674,7 +659,7 @@ export default function Checkout({ cart = [], setCart }) {
         open={openVoucher}
         onClose={() => setOpenVoucher(false)}
         subtotal={subTotal}
-        onPickCode={(code) => { setOpenVoucher(false); applyCoupon(code); }}
+        onPickCode={applyCouponFromDrawer}
       />
     </div>
   );
