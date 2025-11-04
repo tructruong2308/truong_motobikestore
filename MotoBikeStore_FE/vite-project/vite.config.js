@@ -1,7 +1,10 @@
+// vite.config.ts (hoặc vite.config.js)
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-// https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    // ép dùng classic để React không bị tree-shake -> tránh lỗi "useEffect of null"
+    react({ jsxRuntime: 'classic' })
+  ],
 })
