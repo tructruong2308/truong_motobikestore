@@ -13,8 +13,8 @@ return [
 
     // CHỈ cho phép origin FE của bạn (thêm domain khác nếu có)
     'allowed_origins' => [
-        'https://truong-motobikestore.vercel.app',
-        // 'https://web.yourdomain.com', // (tuỳ chọn) domain FE riêng
+        'https://truong-motobikestore.vercel.app',           // FE Vercel (prod)
+        'https://truong-motobikestore-3.onrender.com',
     ],
 
     // Nếu muốn cho phép theo pattern subdomain, dùng cái này thay vì allowed_origins

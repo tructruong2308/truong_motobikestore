@@ -1,26 +1,26 @@
 // src/lib/echo.js
-import Echo from "laravel-echo";
-import Pusher from "pusher-js"; // Echo dùng Pusher protocol
+import Echo from 'laravel-echo'
+import Pusher from 'pusher-js'
 
-window.Pusher = Pusher;
+window.Pusher = Pusher
+
+// Lấy base URL của API (không có /api ở cuối)
+const API_BASE = (import.meta.env.VITE_API_BASE_URL || '').replace(/\/api\/?$/, '')
 
 export function createEcho(token) {
-  // token là Bearer (Sanctum Personal Access Token) của khách
+  // token: Bearer token (Sanctum PAT) của khách
   return new Echo({
-    broadcaster: "reverb",
-    key: import.meta.env.VITE_REVERB_APP_KEY || "local-key",
-    wsHost: import.meta.env.VITE_REVERB_HOST || "127.0.0.1",
-    wsPort: Number(import.meta.env.VITE_REVERB_PORT || 6001),
-    forceTLS: false,
-    enabledTransports: ["ws"],
-
-    // Auth private channel qua Sanctum bằng Bearer token
-    authEndpoint: "http://127.0.0.1:8000/broadcasting/auth",
+    broadcaster: 'pusher',
+    key: import.meta.env.VITE_PUSHER_APP_KEY,       // <- set trên Vercel
+    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER, // <- ap1
+    forceTLS: true,                                  // trang đang https ⇒ dùng wss
+    // Cấu hình auth cho private/presence channel bằng Bearer token
+    authEndpoint: `${API_BASE}/broadcasting/auth`,
     auth: {
       headers: {
-        Accept: "application/json",
+        Accept: 'application/json',
         Authorization: `Bearer ${token}`,
       },
     },
-  });
+  })
 }
