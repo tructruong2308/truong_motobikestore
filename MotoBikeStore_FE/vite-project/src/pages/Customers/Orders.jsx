@@ -102,6 +102,25 @@ const css = `
 .ordersX .card.highlight { outline: 2px solid #60a5fa; box-shadow: 0 0 0 6px rgba(96,165,250,.25); animation: flashPulse 1.2s ease-out 3; }
 `;
 
+/* ===== small helpers ===== */
+const ORIGIN_WHITELIST = [
+  "https://truong-motobikestore.vercel.app",
+  "http://localhost:5173",
+];
+const API_ROOT = API_BASE.replace(/\/api$/, "");
+
+async function fetchJSON(url, options = {}, timeoutMs = 12000) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: ctrl.signal, mode: "cors", credentials: "omit" });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  } finally {
+    clearTimeout(t);
+  }
+}
+
 export default function Orders() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,22 +169,35 @@ export default function Orders() {
       try {
         setLoading(true);
         setMsg("");
+
         if (!API_BASE && import.meta.env.PROD) {
           setMsg("❌ Backend chưa cấu hình (thiếu VITE_API_BASE).");
           return;
         }
-        const token = localStorage.getItem("customer_token");
-        const res = await fetch(`${API_BASE}/orders?per_page=50`, {
-          headers: { Accept: "application/json", Authorization: token ? `Bearer ${token}` : "" },
+
+        const token = localStorage.getItem("customer_token") || "";
+        const { ok, data, status } = await fetchJSON(`${API_BASE}/orders?per_page=50`, {
+          headers: {
+            Accept: "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         });
-        const json = await res.json().catch(() => ({}));
-        if (!res.ok || json?.success === false) throw new Error(json?.message || "Không tải được danh sách đơn hàng");
-        const payload = json?.data;
+
+        if (!ok || data?.success === false) {
+          if (status === 401) {
+            setMsg("❌ Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn.");
+          } else {
+            setMsg("❌ Không tải được danh sách đơn hàng.");
+          }
+          return;
+        }
+
+        const payload = data?.data;
         const list = Array.isArray(payload) ? payload : (payload?.data || []);
         setOrders(list);
         if (!list.length) setMsg("Bạn chưa có đơn hàng nào.");
       } catch (e) {
-        setMsg("❌ " + (e.message || "Có lỗi xảy ra"));
+        setMsg("❌ Không kết nối được máy chủ.");
       } finally {
         setLoading(false);
       }
@@ -185,26 +217,44 @@ export default function Orders() {
   useEffect(() => {
     const token = localStorage.getItem("customer_token");
     const user = JSON.parse(localStorage.getItem("customer_user") || "null");
-    if (!token || !user?.id) return;
+    const originOk = ORIGIN_WHITELIST.includes(window.location.origin);
 
-    const API_ROOT = API_BASE.replace(/\/api$/, "");
+    if (!token || !user?.id) return;          // chưa đăng nhập
+    if (!originOk) {                           // origin không được cấp phép → bỏ qua realtime
+      console.warn("[Orders] Origin not whitelisted for broadcasting:", window.location.origin);
+      return;
+    }
+    if (!import.meta.env.VITE_PUSHER_APP_KEY || !import.meta.env.VITE_PUSHER_APP_CLUSTER) {
+      console.warn("[Orders] Missing Pusher ENV → skip realtime.");
+      return;
+    }
 
     window.Pusher = Pusher;
-    const echo = new Echo({
-      broadcaster: "pusher",
-      key: import.meta.env.VITE_PUSHER_APP_KEY,
-      cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
-      forceTLS: true,
-      authEndpoint: `${API_ROOT}/broadcasting/auth`,
-      auth: {
-        headers: {
-          Accept: "application/json",
-          Authorization: `Bearer ${token}`,
+
+    let echo;
+    try {
+      echo = new Echo({
+        broadcaster: "pusher",
+        key: import.meta.env.VITE_PUSHER_APP_KEY,
+        cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+        forceTLS: true,
+        // Chỉ dùng ws/wss; không gửi cookie; auth qua Bearer
+        enabledTransports: ["ws", "wss"],
+        authEndpoint: `${API_ROOT}/broadcasting/auth`,
+        authTransport: "ajax",
+        auth: {
+          headers: {
+            Accept: "application/json",
+            Authorization: `Bearer ${token}`,
+          },
         },
-      },
-      disableStats: true,
-    });
-    echoRef.current = echo;
+        disableStats: true,
+      });
+      echoRef.current = echo;
+    } catch (err) {
+      console.warn("[Orders] Echo init failed:", err);
+      return;
+    }
 
     const channel = echo.private(`users.${user.id}`);
 
@@ -231,14 +281,20 @@ export default function Orders() {
       tryNotify(text);
     };
 
-    channel
-      .listen(".order.status.updated", handlePayload)
-      .listen(".OrderStatusUpdated", handlePayload);
+    // Lắng nghe 2 tên sự kiện khả dụng
+    try {
+      channel
+        .listen(".order.status.updated", handlePayload)
+        .listen(".OrderStatusUpdated", handlePayload);
+    } catch (err) {
+      console.warn("[Orders] Channel listen failed (likely CORS on /broadcasting/auth). Realtime disabled.", err);
+      try { echo.disconnect(); } catch {}
+    }
 
     return () => {
       try {
-        echo.leave(`users.${user.id}`);
-        echo.disconnect();
+        echo?.leave(`users.${user.id}`);
+        echo?.disconnect();
       } catch {}
     };
   }, []);
@@ -282,13 +338,12 @@ export default function Orders() {
         name: o.name || "", phone: o.phone || "", address: o.address || "", email: o.email || "",
         payment_method: "momo", items, total: calcTotal(o) || undefined,
       };
-      const res = await fetch(`${API_BASE}/checkout`, {
+      const { ok, data } = await fetchJSON(`${API_BASE}/checkout`, {
         method: "POST",
         headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.success === false) throw new Error(data?.message || "Tạo thanh toán MoMo thất bại");
+      if (!ok || data?.success === false) throw new Error(data?.message || "Tạo thanh toán MoMo thất bại");
       if (data.payUrl) window.open(data.payUrl, "_blank"); else alert("✔ Đã tạo đơn mới, nhưng không nhận được payUrl.");
     } catch (e) {
       alert("❌ " + (e.message || "Không thể thanh toán MoMo"));
@@ -299,12 +354,12 @@ export default function Orders() {
     if (!confirm("Bạn muốn hủy đơn này?")) return;
     try {
       const token = localStorage.getItem("customer_token");
-      const res = await fetch(`${API_BASE}/orders/${o.id}/status`, {
+      const { ok } = await fetchJSON(`${API_BASE}/orders/${o.id}/status`, {
         method: "PATCH",
         headers: { Accept: "application/json", "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ status: 5 }),
       });
-      if (!res.ok) throw new Error("Hủy đơn thất bại");
+      if (!ok) throw new Error("Hủy đơn thất bại");
       setOrders((prev) => prev.map((x) => (x.id === o.id ? { ...x, status: 5 } : x)));
       alert("✅ Đã yêu cầu hủy đơn.");
     } catch (e) { alert("❌ " + (e.message || "Hủy đơn thất bại")); }
