@@ -1,5 +1,5 @@
 // src/pages/Customers/Orders.jsx
-import React,{ useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Echo from "laravel-echo";
 import Pusher from "pusher-js";
 
@@ -17,64 +17,6 @@ const API_BASE = (
 
 const PLACEHOLDER = "https://placehold.co/72x72?text=Img";
 const VND = new Intl.NumberFormat("vi-VN");
-
-/* ===== REALTIME (Pusher) ===== */
-useEffect(() => {
-  const token = localStorage.getItem("customer_token");
-  const user = JSON.parse(localStorage.getItem("customer_user") || "null");
-  if (!token || !user?.id) return;
-
-  // API root (không /api)
-  const API_ROOT = API_BASE.replace(/\/api$/, "");
-
-  const echo = new Echo({
-    broadcaster: "pusher",
-    key: import.meta.env.VITE_PUSHER_APP_KEY,
-    cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
-    forceTLS: true,
-    authEndpoint: `${API_ROOT}/broadcasting/auth`,
-    auth: {
-      headers: {
-        Accept: "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-    },
-  });
-  echoRef.current = echo;
-
-  const channel = echo.private(`users.${user.id}`);
-
-  const handlePayload = (payload) => {
-    if (!payload?.order?.id) return;
-    const id = Number(payload.order.id);
-    const sIdx = Number(payload.order.status);
-    const sLabel =
-      ({0:"Chờ xác nhận",1:"Đã xác nhận",2:"Đang đóng gói",3:"Đang giao",4:"Đã giao",5:"Đã huỷ"}[sIdx]) ||
-      "Đã cập nhật trạng thái";
-
-    setOrders((prev) => prev.map((o) => (Number(o.id) === id ? { ...o, status: sIdx } : o)));
-
-    const text = `Đơn #${id}: ${sLabel}`;
-    setOverlay({ open: true, orderId: id, text, status: sIdx, at: new Date().toISOString() });
-
-    const item = { id: `${id}-${Date.now()}`, orderId: id, text, at: new Date().toISOString() };
-    setNotices((prev) => {
-      const next = [item, ...prev].slice(0, 20);
-      localStorage.setItem("order_notices", JSON.stringify(next));
-      return next;
-    });
-    showToast(text);
-    tryNotify(text);
-  };
-
-  channel
-    .listen(".order.status.updated", handlePayload)
-    .listen(".OrderStatusUpdated", handlePayload);
-
-  return () => {
-    try { echo.leave(`users.${user.id}`); echo.disconnect(); } catch {}
-  };
-}, []);
 
 /* Trạng thái -> nhãn + màu */
 const STATUS = {
@@ -239,21 +181,28 @@ export default function Orders() {
     try { sessionStorage.removeItem("focus_order_id"); } catch {}
   }, []);
 
-  /* ===== REALTIME ===== */
+  /* ===== REALTIME (Pusher) ===== */
   useEffect(() => {
     const token = localStorage.getItem("customer_token");
     const user = JSON.parse(localStorage.getItem("customer_user") || "null");
-    if (!WS_ENABLED || !token || !user?.id) return;
+    if (!token || !user?.id) return;
 
+    const API_ROOT = API_BASE.replace(/\/api$/, "");
+
+    window.Pusher = Pusher;
     const echo = new Echo({
-      broadcaster: "reverb",
-      key: REVERB_KEY,
-      wsHost: REVERB_WS_HOST,
-      wsPort: REVERB_WS_PORT,
-      forceTLS: REVERB_TLS,
-      enabledTransports: REVERB_TLS ? ["ws", "wss"] : ["ws"],
-      authEndpoint: `${API_BASE.replace(/\/api$/, "")}/broadcasting/auth`,
-      auth: { headers: { Accept: "application/json", Authorization: `Bearer ${token}` } },
+      broadcaster: "pusher",
+      key: import.meta.env.VITE_PUSHER_APP_KEY,
+      cluster: import.meta.env.VITE_PUSHER_APP_CLUSTER,
+      forceTLS: true,
+      authEndpoint: `${API_ROOT}/broadcasting/auth`,
+      auth: {
+        headers: {
+          Accept: "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      },
+      disableStats: true,
     });
     echoRef.current = echo;
 
@@ -261,11 +210,13 @@ export default function Orders() {
 
     const handlePayload = (payload) => {
       if (!payload?.order?.id) return;
-      const id = payload.order.id;
+      const id = Number(payload.order.id);
       const sIdx = Number(payload.order.status);
-      const sLabel = STATUS[sIdx]?.label || "Đã cập nhật trạng thái";
+      const sLabel =
+        ({0:"Chờ xác nhận",1:"Đã xác nhận",2:"Đang đóng gói",3:"Đang giao",4:"Đã giao",5:"Đã huỷ"}[sIdx]) ||
+        "Đã cập nhật trạng thái";
 
-      setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status: sIdx } : o)));
+      setOrders((prev) => prev.map((o) => (Number(o.id) === id ? { ...o, status: sIdx } : o)));
 
       const text = `Đơn #${id}: ${sLabel}`;
       setOverlay({ open: true, orderId: id, text, status: sIdx, at: new Date().toISOString() });
@@ -280,11 +231,15 @@ export default function Orders() {
       tryNotify(text);
     };
 
-    channel.listen(".order.status.updated", handlePayload);
-    channel.listen(".OrderStatusUpdated", handlePayload);
+    channel
+      .listen(".order.status.updated", handlePayload)
+      .listen(".OrderStatusUpdated", handlePayload);
 
     return () => {
-      try { echo.leave(`private-users.${user.id}`); echo.disconnect(); } catch {}
+      try {
+        echo.leave(`users.${user.id}`);
+        echo.disconnect();
+      } catch {}
     };
   }, []);
 
