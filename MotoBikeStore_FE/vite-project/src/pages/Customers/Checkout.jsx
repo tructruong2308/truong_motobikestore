@@ -2,11 +2,21 @@
 import { useEffect, useMemo, useState } from "react";
 
 const VND = new Intl.NumberFormat("vi-VN");
-const API_BASE = "http://127.0.0.1:8000/api";
+// ✅ dùng env khi build (HTTPS ở production), fallback local khi dev
+const API_BASE = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 
 /* ====== Local helpers ====== */
-const LS_ADDR = "customer_addresses";          // danh sách địa chỉ đã lưu
-const LS_CHECKED = "checkout_selected_ids";    // id sản phẩm được chọn thanh toán
+const LS_ADDR = "customer_addresses";
+const LS_CHECKED = "checkout_selected_ids";
+
+// ✅ ép mọi giá trị tiền về số nguyên sạch (bỏ . , đ khoảng trắng)
+const toInt = (v) => {
+  if (typeof v === "number" && Number.isFinite(v)) return Math.trunc(v);
+  if (v == null) return 0;
+  const s = String(v).replace(/[^\d-]/g, "");
+  const n = parseInt(s, 10);
+  return Number.isFinite(n) ? n : 0;
+};
 
 const loadAddresses = () => {
   try {
@@ -16,7 +26,7 @@ const loadAddresses = () => {
 };
 const saveAddresses = (list) => localStorage.setItem(LS_ADDR, JSON.stringify(list));
 
-/* ====== NEW: Voucher Drawer (nội tuyến, không phụ thuộc lib) ====== */
+/* ====== Voucher Drawer ====== */
 function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
   const [loading, setLoading] = useState(false);
   const [list, setList] = useState([]);
@@ -28,13 +38,13 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
     (async () => {
       setErr(""); setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${Math.round(subtotal) || 0}`, {
+        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${toInt(subtotal)}`, {
           headers: { Accept: "application/json" }
         });
         const data = await res.json();
         setList(Array.isArray(data?.coupons) ? data.coupons : []);
         setBest(data?.best || null);
-      } catch (e) {
+      } catch {
         setErr("Không tải được danh sách voucher.");
       } finally {
         setLoading(false);
@@ -44,16 +54,11 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
 
   if (!open) return null;
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000,
-      display: "flex", justifyContent: "flex-end"
-    }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
       <div style={{ width: "100%", maxWidth: 420, height: "100%", background: "#0b1220", color: "#e2e8f0",
         borderLeft: "1px solid rgba(148,163,184,.2)", display: "flex", flexDirection: "column" }}>
-        <div style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "12px 14px", borderBottom: "1px solid rgba(148,163,184,.2)", background: "rgba(2,6,23,.35)"
-        }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 14px", borderBottom: "1px solid rgba(148,163,184,.2)", background: "rgba(2,6,23,.35)" }}>
           <b>Chọn mã giảm giá</b>
           <button className="btn" onClick={onClose}>Đóng</button>
         </div>
@@ -63,26 +68,20 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
           {err && <div className="tag warn">{err}</div>}
 
           {best?.estimate_discount > 0 && (
-            <button
-              className="btn primary"
-              style={{ width: "100%", marginBottom: 12 }}
-              onClick={() => onPickCode(best.code)}
-            >
+            <button className="btn primary" style={{ width: "100%", marginBottom: 12 }}
+              onClick={() => onPickCode(best.code)}>
               Áp dụng tốt nhất: {best.code} (−{VND.format(Math.round(best.estimate_discount))}₫)
             </button>
           )}
 
           <div style={{ display: "grid", gap: 10 }}>
-            {/* Đủ điều kiện */}
             {list.filter(x => x.eligible).map(v => (
               <div key={v.code} className="card" style={{ borderColor: "rgba(16,185,129,.35)" }}>
                 <div className="card-bd" style={{ display: "grid", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 800 }}>{v.code} {v.badge && <span className="tag" style={{ marginLeft: 8 }}>{v.badge}</span>}</div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        {v.label} • ĐH tối thiểu {VND.format(v.min_order)}₫
-                      </div>
+                      <div className="muted" style={{ fontSize: 13 }}>{v.label} • ĐH tối thiểu {VND.format(v.min_order)}₫</div>
                     </div>
                     <button className="btn" onClick={() => onPickCode(v.code)}>Áp dụng</button>
                   </div>
@@ -90,7 +89,6 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
               </div>
             ))}
 
-            {/* Chưa đủ điều kiện */}
             {list.some(x => !x.eligible) && <div className="muted" style={{ marginTop: 8 }}>Chưa đủ điều kiện</div>}
             {list.filter(x => !x.eligible).map(v => (
               <div key={v.code} className="card">
@@ -98,9 +96,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 800 }}>{v.code}</div>
-                      <div className="muted" style={{ fontSize: 13 }}>
-                        {v.label} • Thiếu {VND.format(Math.ceil(v.lack))}₫
-                      </div>
+                      <div className="muted" style={{ fontSize: 13 }}>{v.label} • Thiếu {VND.format(Math.ceil(v.lack))}₫</div>
                     </div>
                     <button className="btn" disabled>Chưa đạt</button>
                   </div>
@@ -108,9 +104,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
               </div>
             ))}
 
-            {!loading && list.length === 0 && (
-              <div className="muted">Hiện chưa có mã phù hợp để hiển thị.</div>
-            )}
+            {!loading && list.length === 0 && (<div className="muted">Hiện chưa có mã phù hợp để hiển thị.</div>)}
           </div>
         </div>
       </div>
@@ -120,7 +114,6 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
 
 export default function Checkout({ cart = [], setCart }) {
   /* =================== STATE =================== */
-  // danh sách id đã chọn từ trang Cart (nếu trống => thanh toán cả giỏ)
   const selectedIds = useMemo(() => {
     try {
       const arr = JSON.parse(localStorage.getItem(LS_CHECKED) || "[]");
@@ -128,36 +121,25 @@ export default function Checkout({ cart = [], setCart }) {
     } catch { return new Set(); }
   }, []);
 
-  // giỏ thực sự đem đi thanh toán
   const cartForCheckout = useMemo(
     () => (selectedIds.size ? cart.filter(x => selectedIds.has(String(x.id))) : cart),
     [cart, selectedIds]
   );
 
-  // user & form
   const [form, setForm] = useState({
-    customer_name: "",
-    phone: "",
-    email: "",
-    address: "",
-    note: "",
-    payment_method: "cod", // cod | momo
+    customer_name: "", phone: "", email: "", address: "", note: "", payment_method: "cod",
   });
 
-  // địa chỉ đã lưu & chọn nhanh
   const [addresses, setAddresses] = useState(loadAddresses());
-  const [addrIndex, setAddrIndex] = useState(-1); // -1 = nhập tay
+  const [addrIndex, setAddrIndex] = useState(-1);
 
-  // vận chuyển & mã giảm giá
-  const [ship, setShip] = useState("standard"); // standard|fast|express
+  const [ship, setShip] = useState("standard");
   const [coupon, setCoupon] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null); // {code, discount_from_be, be, desc}
 
-  // ===== NEW: voucher drawer controls & gợi ý tốt nhất ngoài drawer =====
   const [openVoucher, setOpenVoucher] = useState(false);
-  const [bestHint, setBestHint] = useState(null); // {code, estimate_discount}
+  const [bestHint, setBestHint] = useState(null); // {code, off}
 
-  // hệ thống
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -195,7 +177,6 @@ export default function Checkout({ cart = [], setCart }) {
     }
   }, []);
 
-  // đồng bộ giỏ (để header/tab khác biết)
   useEffect(() => {
     localStorage.setItem("cart", JSON.stringify(cart || []));
     window.dispatchEvent(new Event("cart:refresh"));
@@ -203,38 +184,26 @@ export default function Checkout({ cart = [], setCart }) {
 
   /* =================== TÍNH TIỀN =================== */
   const subTotal = useMemo(
-    () => cartForCheckout.reduce((s, i) => s + (i.qty || 1) * Number(i.price || 0), 0),
+    () => cartForCheckout.reduce((s, i) => s + (i.qty || 1) * toInt(i.price), 0),
     [cartForCheckout]
   );
 
-  const shippingFee = useMemo(() => {
-    switch (ship) {
-      case "fast": return 25000;
-      case "express": return 50000;
-      default: return 0;
-    }
-  }, [ship]);
+  const shippingFee = useMemo(() => (ship === "fast" ? 25000 : ship === "express" ? 50000 : 0), [ship]);
 
-  // Ưu tiên số giảm giá trả về từ BE
+  // ✅ đảm bảo trừ đúng: ép số sạch và chặn > subtotal
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
-    if (appliedCoupon.discount_from_be != null) {
-      return Math.min(Number(appliedCoupon.discount_from_be) || 0, subTotal);
-    }
-    return 0;
+    const d = toInt(appliedCoupon.discount_from_be);
+    return Math.min(d, subTotal);
   }, [appliedCoupon, subTotal]);
 
-  const shipAfterCoupon = useMemo(() => {
-    // hiện BE chưa hỗ trợ freeship, nên giữ nguyên phí ship
-    return shippingFee;
-  }, [shippingFee]);
+  const shipAfterCoupon = shippingFee; // chưa hỗ trợ freeship
 
   const grandTotal = useMemo(
     () => Math.max(0, subTotal - discount) + shipAfterCoupon,
     [subTotal, discount, shipAfterCoupon]
   );
 
-  // MoMo sandbox: 1.000 – 50.000.000
   const momoDisabled = grandTotal < 1000 || grandTotal > 50_000_000;
   const momoReason =
     grandTotal > 50_000_000
@@ -270,7 +239,7 @@ export default function Checkout({ cart = [], setCart }) {
     }
     const list = [a, ...addresses.filter(x =>
       x.name !== a.name || x.phone !== a.phone || x.address !== a.address
-    )].slice(0, 5); // lưu tối đa 5 mẫu
+    )].slice(0, 5);
     setAddresses(list);
     saveAddresses(list);
     setAddrIndex(0);
@@ -278,7 +247,6 @@ export default function Checkout({ cart = [], setCart }) {
   };
 
   /* =================== COUPON =================== */
-  // GỌI API validate thay vì luật demo
   const applyCoupon = async (forceCode) => {
     const code = (forceCode ?? coupon ?? "").trim().toUpperCase();
     if (!code) { setAppliedCoupon(null); setMsg(""); return; }
@@ -293,7 +261,7 @@ export default function Checkout({ cart = [], setCart }) {
           Accept: "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ code, subtotal: Math.round(subTotal) || 0 }),
+        body: JSON.stringify({ code, subtotal: toInt(subTotal) }),
       });
       const data = await res.json().catch(()=> ({}));
 
@@ -306,42 +274,34 @@ export default function Checkout({ cart = [], setCart }) {
       setAppliedCoupon({
         code,
         desc: "Áp dụng từ máy chủ",
-        discount_from_be: Number(data.discount || 0),
+        discount_from_be: toInt(data.discount), // ✅ ép số sạch ngay tại đây
         be: data.data,
       });
       setCoupon(code);
-      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(Number(data.discount||0))}₫`);
+      setMsg(`✅ Đã áp dụng ${code}: -${VND.format(toInt(data.discount))}₫`);
     } catch {
       setAppliedCoupon(null);
       setMsg("❌ Không kết nối được máy chủ");
     }
   };
 
-  const clearCoupon = () => {
-    setAppliedCoupon(null);
-    setCoupon("");
-    setBestHint(null);
-  };
+  const clearCoupon = () => { setAppliedCoupon(null); setCoupon(""); setBestHint(null); };
 
-  // ===== NEW: Gợi ý mã tốt nhất ngay khi vào trang (nếu có) =====
+  // Gợi ý mã tốt nhất theo subtotal
   useEffect(() => {
     let stop = false;
     (async () => {
       try {
         if (subTotal <= 0) { setBestHint(null); return; }
-        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${Math.round(subTotal) || 0}`, {
+        const res = await fetch(`${API_BASE}/coupons/claimable?subtotal=${toInt(subTotal)}`, {
           headers: { Accept: "application/json" }
         });
         const data = await res.json();
         if (stop) return;
         if (data?.best?.estimate_discount > 0) {
           setBestHint({ code: data.best.code, off: Math.round(data.best.estimate_discount) });
-        } else {
-          setBestHint(null);
-        }
-      } catch {
-        setBestHint(null);
-      }
+        } else setBestHint(null);
+      } catch { setBestHint(null); }
     })();
     return () => { stop = true; };
   }, [subTotal]);
@@ -364,8 +324,8 @@ export default function Checkout({ cart = [], setCart }) {
     }
 
     const items = cartForCheckout.map((i) => {
-      const q = Number(i.qty || 1);
-      const p = Number(i.price || 0);
+      const q = toInt(i.qty || 1);
+      const p = toInt(i.price || 0);
       return {
         id: i.id,
         product_id: i.id,
@@ -380,36 +340,29 @@ export default function Checkout({ cart = [], setCart }) {
     });
 
     const payload = {
-      // Thông tin khách
       name: form.customer_name,
       phone: form.phone,
       email: form.email || null,
       address: form.address,
       note: form.note || null,
 
-      // Tổng tiền
-      subtotal: Math.round(subTotal) || 0,
-      discount: Math.round(discount) || 0,
+      subtotal: toInt(subTotal),
+      discount: toInt(discount),
       shipping_method: ship,
-      shipping_fee: Math.round(shipAfterCoupon) || 0,
-      total: Math.round(grandTotal) || 0,
+      shipping_fee: toInt(shipAfterCoupon),
+      total: toInt(grandTotal),
 
-      // Items
       items,
       order_details: items,
 
-      // Nhân bản theo BE cũ
       customer_name: form.customer_name,
       customer_phone: form.phone,
       customer_email: form.email || null,
       customer_address: form.address,
       customer_note: form.note || null,
-      customer_total: Math.round(grandTotal) || 0,
+      customer_total: toInt(grandTotal),
 
-      // Thanh toán
       payment_method: form.payment_method,
-
-      // Coupon
       coupon_code: appliedCoupon?.code || null,
     };
 
@@ -443,17 +396,11 @@ export default function Checkout({ cart = [], setCart }) {
 
       if (form.payment_method === "momo" && data?.payUrl) {
         localStorage.removeItem(LS_CHECKED);
-        // Không xoá giỏ — chờ IPN xác nhận
         window.location.href = data.payUrl;
         return;
       }
 
-      // COD: xoá đúng phần đã thanh toán
-      const nextCart =
-        selectedIds.size === 0
-          ? []
-          : cart.filter((x) => !selectedIds.has(String(x.id)));
-
+      const nextCart = selectedIds.size === 0 ? [] : cart.filter((x) => !selectedIds.has(String(x.id)));
       setCart(nextCart);
       localStorage.setItem("cart", JSON.stringify(nextCart));
       localStorage.removeItem(LS_CHECKED);
@@ -467,7 +414,7 @@ export default function Checkout({ cart = [], setCart }) {
     }
   };
 
-  /* =================== UI (Shopee-ish) =================== */
+  /* =================== UI =================== */
   const css = `
 .co-shell{display:grid;grid-template-columns:1.5fr .9fr;gap:16px}
 @media (max-width: 1024px){.co-shell{grid-template-columns:1fr}}
@@ -535,33 +482,16 @@ export default function Checkout({ cart = [], setCart }) {
               </div>
 
               <div className="row">
-                <input
-                  className="u-input input"
-                  placeholder="Họ tên"
-                  value={form.customer_name}
-                  onChange={(e) => setForm({ ...form, customer_name: e.target.value })}
-                />
-                <input
-                  className="u-input input"
-                  placeholder="Số điện thoại"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                />
+                <input className="u-input input" placeholder="Họ tên"
+                  value={form.customer_name} onChange={(e) => setForm({ ...form, customer_name: e.target.value })}/>
+                <input className="u-input input" placeholder="Số điện thoại"
+                  value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}/>
               </div>
-              <input
-                className="u-input"
-                placeholder="Địa chỉ"
-                value={form.address}
-                onChange={(e) => setForm({ ...form, address: e.target.value })}
-              />
+              <input className="u-input" placeholder="Địa chỉ"
+                value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}/>
               <div className="row">
-                <input
-                  className="u-input input"
-                  placeholder="Email (tuỳ chọn)"
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
-                />
+                <input className="u-input input" placeholder="Email (tuỳ chọn)" type="email"
+                  value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}/>
                 <span className="tag">Thông báo đơn hàng sẽ gửi qua email (nếu có)</span>
               </div>
             </div>
@@ -579,16 +509,13 @@ export default function Checkout({ cart = [], setCart }) {
             </div>
             <div className="card-bd" style={{ display: "grid", gap: 10 }}>
               {cartForCheckout.map((i) => {
-                const qty = Number(i.qty || 1);
-                const price = Number(i.price || 0);
+                const qty = toInt(i.qty || 1);
+                const price = toInt(i.price || 0);
                 return (
                   <div className="item" key={i.id}>
-                    <img
-                      className="thumb"
+                    <img className="thumb"
                       src={i.thumbnail_url || "https://placehold.co/64x64?text=No+Img"}
-                      onError={(e) =>
-                        (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")
-                      }
+                      onError={(e) => (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")}
                     />
                     <div>
                       <div className="name">{i.name}</div>
@@ -598,16 +525,14 @@ export default function Checkout({ cart = [], setCart }) {
                   </div>
                 );
               })}
-              {!cartForCheckout.length && (
-                <div className="muted">Chưa có sản phẩm nào. Hãy quay lại giỏ hàng nhé.</div>
-              )}
+              {!cartForCheckout.length && <div className="muted">Chưa có sản phẩm nào. Hãy quay lại giỏ hàng nhé.</div>}
             </div>
           </div>
         </div>
 
         {/* ========== Cột phải ========== */}
         <div style={{ display: "grid", gap: 12 }}>
-          {/* Phương thức & vận chuyển */}
+          {/* Thanh toán & vận chuyển */}
           <div className="card">
             <div className="card-hd"><b>Thanh toán & Vận chuyển</b></div>
             <div className="card-bd" style={{ display: "grid", gap: 14 }}>
@@ -615,22 +540,13 @@ export default function Checkout({ cart = [], setCart }) {
                 <b>Phương thức thanh toán</b>
                 <div className="pm-row">
                   <label>
-                    <input
-                      type="radio"
-                      name="pm"
-                      checked={form.payment_method === "cod"}
-                      onChange={() => setForm({ ...form, payment_method: "cod" })}
-                    />{" "}
+                    <input type="radio" name="pm" checked={form.payment_method === "cod"}
+                      onChange={() => setForm({ ...form, payment_method: "cod" })}/> {" "}
                     Thanh toán khi nhận hàng (COD)
                   </label>
                   <label title={momoDisabled ? momoReason : ""} style={{ opacity: momoDisabled ? 0.7 : 1 }}>
-                    <input
-                      type="radio"
-                      name="pm"
-                      checked={form.payment_method === "momo"}
-                      onChange={() => setForm({ ...form, payment_method: "momo" })}
-                      disabled={momoDisabled}
-                    />{" "}
+                    <input type="radio" name="pm" checked={form.payment_method === "momo"}
+                      onChange={() => setForm({ ...form, payment_method: "momo" })} disabled={momoDisabled}/> {" "}
                     Ví MoMo / QR online {momoDisabled && <span className="tag warn">{momoReason}</span>}
                   </label>
                 </div>
@@ -641,18 +557,12 @@ export default function Checkout({ cart = [], setCart }) {
               <div>
                 <b>Chọn hình thức vận chuyển</b>
                 <div className="pm-row">
-                  <label>
-                    <input type="radio" name="ship" value="standard" checked={ship === "standard"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Tiêu chuẩn — {VND.format(0)}₫
-                  </label>
-                  <label>
-                    <input type="radio" name="ship" value="fast" checked={ship === "fast"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Nhanh — {VND.format(25000)}₫
-                  </label>
-                  <label>
-                    <input type="radio" name="ship" value="express" checked={ship === "express"} onChange={(e) => setShip(e.target.value)} />{" "}
-                    Hoả tốc — {VND.format(50000)}₫
-                  </label>
+                  <label><input type="radio" name="ship" value="standard" checked={ship === "standard"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Tiêu chuẩn — {VND.format(0)}₫</label>
+                  <label><input type="radio" name="ship" value="fast" checked={ship === "fast"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Nhanh — {VND.format(25000)}₫</label>
+                  <label><input type="radio" name="ship" value="express" checked={ship === "express"} onChange={(e) => setShip(e.target.value)}/> {" "}
+                    Hoả tốc — {VND.format(50000)}₫</label>
                 </div>
               </div>
 
@@ -661,19 +571,13 @@ export default function Checkout({ cart = [], setCart }) {
               <div>
                 <b>Mã giảm giá</b>
                 <div className="coupon">
-                  <input
-                    className="u-input"
-                    placeholder="Nhập mã giảm giá"
-                    value={coupon}
-                    onChange={(e) => setCoupon(e.target.value)}
-                    style={{ flex: 1 }}
-                  />
+                  <input className="u-input" placeholder="Nhập mã giảm giá"
+                    value={coupon} onChange={(e) => setCoupon(e.target.value)} style={{ flex: 1 }}/>
                   <button className="btn" onClick={() => applyCoupon()}>Áp dụng</button>
                   <button className="btn" onClick={() => setOpenVoucher(true)}>Chọn mã</button>
                   {appliedCoupon && <button className="btn" onClick={clearCoupon}>Huỷ mã</button>}
                 </div>
 
-                {/* NEW: gợi ý tốt nhất (nếu chưa áp mã) */}
                 {!appliedCoupon && bestHint?.off > 0 && (
                   <div className="hint">
                     <span className="tag">Gợi ý</span>
@@ -693,12 +597,8 @@ export default function Checkout({ cart = [], setCart }) {
 
               <div>
                 <b>Lời nhắn cho shop</b>
-                <textarea
-                  className="u-input note"
-                  placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi đến…"
-                  value={form.note}
-                  onChange={(e) => setForm({ ...form, note: e.target.value })}
-                />
+                <textarea className="u-input note" placeholder="Ví dụ: Giao giờ hành chính, gọi trước khi đến…"
+                  value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })}/>
               </div>
             </div>
           </div>
@@ -718,18 +618,14 @@ export default function Checkout({ cart = [], setCart }) {
           {/* Thanh xác nhận */}
           <div className="bar">
             {msg && <div className="tag" style={{ background: "rgba(6,78,59,.25)" }}>{msg}</div>}
-            <button
-              className="btn primary"
-              onClick={submit}
-              disabled={loading || !cartForCheckout.length}
-            >
+            <button className="btn primary" onClick={submit} disabled={loading || !cartForCheckout.length}>
               {loading ? "Đang xử lý…" : form.payment_method === "momo" ? "Thanh toán MoMo" : "Đặt hàng COD"}
             </button>
           </div>
         </div>
       </div>
 
-      {/* NEW: Drawer chọn mã */}
+      {/* Drawer chọn mã */}
       <VoucherDrawer
         open={openVoucher}
         onClose={() => setOpenVoucher(false)}
