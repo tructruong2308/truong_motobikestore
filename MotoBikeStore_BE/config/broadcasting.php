@@ -10,7 +10,7 @@ return [
     | Hãy trỏ về biến BROADCAST_CONNECTION (hoặc dùng 'reverb' nếu không có).
     |
     */
-    'default' => env('BROADCAST_CONNECTION', env('BROADCAST_DRIVER', 'reverb')),
+    'default' => env('BROADCAST_CONNECTION', env('BROADCAST_DRIVER', 'pusher')),
 
     /*
     |--------------------------------------------------------------------------
