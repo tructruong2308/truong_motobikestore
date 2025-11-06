@@ -46,7 +46,7 @@ export default function BlogDetail() {
 
   return (
     <main className="bg-gradient-to-b from-white to-slate-50/60">
-      <section className="max-w-6xl mx-auto px-4 py-10 md:py-14">
+      <section className="max-w-5xl mx-auto px-4 py-10 md:py-14">
         {/* Breadcrumb */}
         <nav className="text-sm mb-6 md:mb-8 text-slate-500 flex items-center gap-2">
           <Link to="/" className="hover:text-slate-700 transition">Trang chủ</Link>
@@ -64,7 +64,7 @@ export default function BlogDetail() {
         </h1>
 
         {/* Meta */}
-        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px] meta-gap">
+        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px]">
           {post.source && <span className="mr-2">Nguồn: <b className="text-slate-800">{post.source}</b></span>}
           {post.author && <span className="mx-2">• Tác giả: <b className="text-slate-800">{post.author}</b></span>}
           {post.published_at && (
@@ -74,96 +74,46 @@ export default function BlogDetail() {
           )}
         </p>
 
-        {/* Card */}
-        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        {/* Article card */}
+        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Cover */}
           {post.thumbnail_url && (
             <img
               src={post.thumbnail_url}
               alt="thumb"
-              className="w-full max-h-[460px] object-cover cover-img"
+              className="w-full max-h-[460px] object-cover rounded-t-2xl"
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           )}
 
           {/* Content */}
           <article className="p-5 md:p-8">
+            {/* Tinh chỉnh prose cho đẹp & dễ đọc */}
             <style>{`
-              /* Vùng đọc: báo chí, dễ đọc */
-              .reading{ 
-                max-width: 72ch;             /* ~72 ký tự/ dòng */
-                margin-inline: auto;
-                color: #0f172a;
-                letter-spacing: .1px;
+              .prose :where(a):not(:where([class~="not-prose"] *)){
+                color:#0ea5e9; text-decoration:none
               }
-              @media (min-width: 768px){
-                .reading{ font-size: 18px; line-height: 1.9; }
+              .prose :where(a:hover):not(:where([class~="not-prose"] *)){
+                text-decoration:underline
               }
-              @media (max-width: 767.9px){
-                .reading{ font-size: 16px; line-height: 1.8; }
+              .prose :where(code):not(:where([class~="not-prose"] *)){
+                background:#f8fafc;padding:.15rem .35rem;border-radius:.4rem;border:1px solid #e2e8f0
               }
-              .meta-gap{ margin-top: .35rem; }
-              .cover-img{ box-shadow: 0 10px 24px rgba(15,23,42,.08); }
-
-              .reading p{
-                margin: 0 0 1.1em 0;
-                text-align: justify;
-                text-justify: inter-word;
-                hyphens: auto;
+              .prose :where(img):not(:where([class~="not-prose"] *)){
+                border-radius:1rem;border:1px solid #e2e8f0
               }
-              .reading h2{
-                font-size: 1.45em;
-                font-weight: 800;
-                color: #0f172a;
-                margin: 2.2em 0 .9em 0;
-                line-height: 1.3;
-                text-wrap: balance;
+              .prose :where(h2,h3){
+                scroll-margin-top:80px
               }
-              .reading h3{
-                font-size: 1.25em;
-                font-weight: 800;
-                margin: 1.8em 0 .7em 0;
-                line-height: 1.35;
-              }
-              .reading img{
-                display:block;
-                max-width:100%;
-                height:auto;
-                margin: 1rem auto;
-                border-radius: 14px;
-                border: 1px solid #e2e8f0;
-              }
-              .reading figure{ margin: 1rem 0; }
-              .reading figcaption{
-                font-size: .85rem; color:#64748b; text-align:center; margin-top:.35rem;
-              }
-              .reading ul, .reading ol{ padding-left: 1.2rem; margin: .75rem 0 1rem 0; }
-              .reading li{ margin: .25rem 0; }
-              .reading blockquote{
-                margin: 1.25rem 0; padding: .5rem 1rem;
-                border-left: 4px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:.5rem;
-              }
-              .reading code{
-                background:#f8fafc; border:1px solid #e2e8f0; padding:.15rem .35rem; border-radius:.35rem;
-                font-size: .92em;
-              }
-              .reading hr{ border:none; border-top:1px solid #e2e8f0; margin:2rem 0; }
-              .reading table{
-                width:100%; border-collapse:collapse; font-size:.95em; margin:1rem 0;
-              }
-              .reading th, .reading td{
-                border:1px solid #e2e8f0; padding:.6rem .7rem; text-align:left;
-              }
-              .reading a{ color:#0ea5e9; text-decoration:none }
-              .reading a:hover{ text-decoration:underline }
             `}</style>
 
-            <div
-              className="reading"
-              dangerouslySetInnerHTML={{
-                __html: post.content || post.excerpt || "",
-              }}
-            />
+            <div className="prose prose-slate max-w-none prose-headings:font-extrabold prose-h2:text-2xl prose-h3:text-xl prose-p:leading-7">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: post.content || post.excerpt || "",
+                }}
+              />
+            </div>
           </article>
         </div>
       </section>
