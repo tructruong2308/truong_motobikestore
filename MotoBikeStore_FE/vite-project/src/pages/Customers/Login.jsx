@@ -86,26 +86,51 @@ export default function Login() {
         placeItems: "center",
         padding: 16,
         background:
-          "radial-gradient(1000px 600px at 10% -10%, #1f2937 0%, transparent 55%), radial-gradient(1000px 600px at 110% 10%, #0ea5e9 0%, transparent 50%), #0b1320",
+          // Nền trắng sáng, có chút gradient rất nhẹ để không phẳng quá
+          "linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #f1f5f9 100%)",
+        color: "#0f172a",
       }}
     >
       <div
         className="u-card u-border"
-        style={{ width: "100%", maxWidth: 440, padding: 18 }}
+        style={{
+          width: "100%",
+          maxWidth: 440,
+          padding: 18,
+          background: "#ffffff",
+          borderColor: "#e5e7eb",
+          boxShadow:
+            "0 1px 2px rgba(0,0,0,.04), 0 8px 30px rgba(17,24,39,.06)",
+          borderRadius: 12,
+        }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div
             className="u-chip"
             style={{
-              background: "rgba(15,23,42,.4)",
-              borderColor: "rgba(148,163,184,.25)",
+              background: "#f1f5f9",
+              borderColor: "#e5e7eb",
+              color: "#0f172a",
             }}
           >
             MotoBikeStore
           </div>
-          <div className="u-chip">Khu vực khách hàng</div>
+          <div
+            className="u-chip"
+            style={{
+              background: "#f8fafc",
+              borderColor: "#e5e7eb",
+              color: "#334155",
+            }}
+          >
+            Khu vực khách hàng
+          </div>
           <div style={{ flex: 1 }} />
-          <div className="u-chip" title="MotoBikeStore" style={{ fontWeight: 800 }}>
+          <div
+            className="u-chip"
+            title="MotoBikeStore"
+            style={{ fontWeight: 800, background: "#f8fafc", borderColor: "#e5e7eb" }}
+          >
             🏍️
           </div>
         </div>
@@ -116,11 +141,12 @@ export default function Login() {
             fontSize: 24,
             fontWeight: 900,
             lineHeight: 1.2,
+            color: "#0f172a",
           }}
         >
           Đăng nhập
         </h1>
-        <p style={{ margin: 0, opacity: 0.85 }}>
+        <p style={{ margin: 0, opacity: 0.85, color: "#334155" }}>
           Nhập email và mật khẩu để tiếp tục mua sắm.
         </p>
 
@@ -130,13 +156,12 @@ export default function Login() {
             style={{
               marginTop: 12,
               padding: 10,
-              borderColor: msg.startsWith("✅")
-                ? "rgba(16,185,129,.35)"
-                : "rgba(239,68,68,.35)",
-              color: msg.startsWith("✅") ? "#6fe0b1" : "#fecaca",
+              borderColor: msg.startsWith("✅") ? "#86efac" : "#fecaca",
+              color: msg.startsWith("✅") ? "#166534" : "#991b1b",
               background: msg.startsWith("✅")
-                ? "linear-gradient(180deg, rgba(6,78,59,.25), rgba(6,95,70,.2))"
-                : "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
+                ? "linear-gradient(180deg, #ecfdf5, #dcfce7)"
+                : "linear-gradient(180deg, #fff1f2, #ffe4e6)",
+              borderRadius: 10,
             }}
           >
             {msg}
@@ -146,7 +171,13 @@ export default function Login() {
         <form onSubmit={submit} style={{ marginTop: 14, display: "grid", gap: 12 }}>
           <div>
             <label
-              style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}
+              style={{
+                display: "block",
+                marginBottom: 6,
+                fontSize: 13,
+                opacity: 0.9,
+                color: "#334155",
+              }}
             >
               E-mail
             </label>
@@ -158,8 +189,11 @@ export default function Login() {
               onChange={onChange}
               className="u-input"
               style={{
-                background: "rgba(2,6,23,.5)",
-                borderColor: "rgba(148,163,184,.25)",
+                background: "#ffffff",
+                borderColor: "#e5e7eb",
+                color: "#0f172a",
+                outline: "none",
+                boxShadow: "inset 0 1px 2px rgba(0,0,0,.03)",
               }}
               autoFocus
               required
@@ -168,7 +202,13 @@ export default function Login() {
 
           <div>
             <label
-              style={{ display: "block", marginBottom: 6, fontSize: 13, opacity: 0.9 }}
+              style={{
+                display: "block",
+                marginBottom: 6,
+                fontSize: 13,
+                opacity: 0.9,
+                color: "#334155",
+              }}
             >
               Mật khẩu
             </label>
@@ -182,8 +222,11 @@ export default function Login() {
                 className="u-input"
                 style={{
                   paddingRight: 82,
-                  background: "rgba(2,6,23,.5)",
-                  borderColor: "rgba(148,163,184,.25)",
+                  background: "#ffffff",
+                  borderColor: "#e5e7eb",
+                  color: "#0f172a",
+                  outline: "none",
+                  boxShadow: "inset 0 1px 2px rgba(0,0,0,.03)",
                 }}
                 required
               />
@@ -191,7 +234,16 @@ export default function Login() {
                 type="button"
                 onClick={() => setShowPw((v) => !v)}
                 className="u-btn outline"
-                style={{ position: "absolute", right: 6, top: 6, height: 30, padding: "0 10px" }}
+                style={{
+                  position: "absolute",
+                  right: 6,
+                  top: 6,
+                  height: 30,
+                  padding: "0 10px",
+                  background: "#f8fafc",
+                  borderColor: "#e5e7eb",
+                  color: "#0f172a",
+                }}
                 aria-label={showPw ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
               >
                 {showPw ? "Ẩn" : "Hiện"}
@@ -207,6 +259,11 @@ export default function Login() {
               opacity: canSubmit ? 1 : 0.6,
               cursor: canSubmit ? "pointer" : "not-allowed",
               marginTop: 4,
+              background: "#0ea5e9",
+              borderColor: "#0ea5e9",
+              color: "white",
+              fontWeight: 700,
+              borderRadius: 10,
             }}
           >
             {loading ? "⏳ Đang đăng nhập..." : "🔓 Đăng nhập"}
@@ -219,17 +276,36 @@ export default function Login() {
             display: "flex",
             justifyContent: "space-between",
             alignItems: "center",
-            opacity: 0.8,
+            opacity: 0.9,
             fontSize: 13,
+            color: "#334155",
           }}
         >
           <span>
             Chưa có tài khoản?{" "}
-            <Link className="u-chip" to="/register" style={{ textDecoration: "none" }}>
+            <Link
+              className="u-chip"
+              to="/register"
+              style={{
+                textDecoration: "none",
+                background: "#eef2ff",
+                borderColor: "#e0e7ff",
+                color: "#3730a3",
+              }}
+            >
               Đăng ký
             </Link>
           </span>
-          <a href="/" className="u-chip" style={{ textDecoration: "none" }}>
+          <a
+            href="/"
+            className="u-chip"
+            style={{
+              textDecoration: "none",
+              background: "#f1f5f9",
+              borderColor: "#e5e7eb",
+              color: "#0f172a",
+            }}
+          >
             ← Về trang chủ
           </a>
         </div>
