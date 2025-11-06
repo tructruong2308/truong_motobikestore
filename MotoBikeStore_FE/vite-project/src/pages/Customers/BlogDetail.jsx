@@ -88,94 +88,89 @@ export default function BlogDetail() {
 
           {/* Content */}
           <article className="p-5 md:p-8">
-            {/* --- STYLE TUNING: mạnh tay để khác biệt rõ --- */}
+            {/* ==== TINH CSS – giữ nguyên JSX ==== */}
             <style>{`
-              /* Container đọc: width tối ưu + type scale responsive */
+              /* Cột đọc tối ưu và type scale mềm */
               .reading{
-                max-width: 68ch;
+                max-width: 62ch;                  
                 margin-inline: auto;
-                color:#0f172a;
-                font-size: clamp(1rem, .94rem + .35vw, 1.12rem);
-                line-height: 1.9;
-                letter-spacing:.12px;
+                color:#1f2937;                     
+                font-size: clamp(1rem, .96rem + .28vw, 1.08rem);
+                line-height: 1.85;
+                letter-spacing: .003em;
+                word-spacing: .02em;
+                font-feature-settings: "kern","liga";
+                text-rendering: optimizeLegibility;
               }
-
-              /* Đoạn văn có nhịp, khoảng trắng rộng */
+              /* Đoạn văn: bỏ justify để tránh rãnh trắng, tăng nhịp đoạn */
               .reading p{
-                margin: 0 0 1.15em 0;
+                margin: 0 0 1.25em 0;
                 overflow-wrap:anywhere;
-                text-align: justify;
-                text-justify: inter-word;
-                hyphens: auto;
+                text-align: left;                  
+                hyphens: manual;
               }
-
-              /* Drop-cap đoạn đầu: nhìn "tạp chí" hơn */
+              /* Drop-cap nhẹ */
               .reading p:first-of-type::first-letter{
                 float:left;
-                font-size: 3.2em;
+                font-size: 2.6em;
                 line-height:.9;
-                padding:.08em .14em 0 0;
+                padding:.08em .16em 0 0;
                 font-weight:800;
-                color:#0f172a;
+                color:#111827;
               }
-
-              /* Heading rõ nhịp */
+              /* Heading */
               .reading h2{
-                font-size: clamp(1.25rem, 1.1rem + .6vw, 1.6rem);
+                font-size: clamp(1.25rem, 1.08rem + .7vw, 1.6rem);
                 font-weight: 800;
                 line-height:1.3;
-                margin: 2.15em 0 .95em 0;
+                margin: 2.1em 0 .9em 0;
                 color:#0f172a;
                 text-wrap: balance;
               }
               .reading h3{
-                font-size: clamp(1.12rem, 1.02rem + .45vw, 1.35rem);
+                font-size: clamp(1.12rem, 1.02rem + .5vw, 1.35rem);
                 font-weight: 800;
                 line-height:1.35;
                 margin: 1.6em 0 .7em 0;
+                color:#0f172a;
               }
-
-              /* Ảnh trong bài: không méo, không phình, bóng nhẹ */
+              /* Ảnh trong nội dung: không méo, chiều cao hợp lý */
               .reading img{
                 display:block;
                 width:100%;
-                height:auto;                /* chống méo */
-                max-height: 420px;          /* chống phình quá cao */
+                height:auto;
+                max-height: 360px;
                 object-fit: cover;
                 object-position: center;
-                margin: 1.1rem 0;
+                margin: 1.05rem 0;
                 border-radius: 14px;
-                border: 1px solid #e2e8f0;
+                border: 1px solid #e5e7eb;
                 box-shadow: 0 10px 26px rgba(15,23,42,.08);
               }
-
-              .reading figure{ margin:1.1rem 0 }
+              @media (max-width: 768px){
+                .reading{ max-width: 58ch; font-size: 1rem; line-height: 1.82; }
+                .reading img{ max-height: 260px; }
+              }
+              .reading figure{ margin:1.05rem 0 }
               .reading figcaption{
-                font-size:.86rem; color:#64748b; text-align:center; margin-top:.4rem
+                font-size:.86rem; color:#64748b; text-align:center; margin-top:.45rem
               }
-
-              /* Danh sách & blockquote */
-              .reading ul, .reading ol{ padding-left:1.15rem; margin:.55rem 0 .9rem 0 }
-              .reading li{ margin:.25rem 0 }
+              /* List / Blockquote / Table / Code */
+              .reading ul, .reading ol{ padding-left:1.1rem; margin:.4rem 0 1rem 0 }
+              .reading li{ margin:.22rem 0 }
               .reading blockquote{
-                margin:1.15rem 0; padding:.7rem 1rem;
-                border-left:4px solid #e2e8f0; background:#f8fafc;
-                color:#475569; border-radius:.55rem;
+                margin:1.2rem 0; padding:.75rem 1rem;
+                border-left:4px solid #e5e7eb; background:#f8fafc;
+                color:#475569; border-radius:.6rem;
               }
-
-              /* Bảng & code inline */
               .reading table{ width:100%; border-collapse:collapse; font-size:.96em; margin:1rem 0 }
-              .reading th, .reading td{ border:1px solid #e2e8f0; padding:.6rem .7rem; text-align:left }
+              .reading th, .reading td{ border:1px solid #e5e7eb; padding:.6rem .7rem; text-align:left }
               .reading code{
-                background:#f8fafc; border:1px solid #e2e8f0;
+                background:#f8fafc; border:1px solid #e5e7eb;
                 padding:.18rem .38rem; border-radius:.38rem; font-size:.92em;
               }
-
-              /* Link */
               .reading a{ color:#0ea5e9; text-decoration:none }
               .reading a:hover{ text-decoration:underline }
-
-              /* Ngắt dòng an toàn cho mọi phần tử nội dung nhúng */
               .reading *{ max-width:100% }
             `}</style>
 

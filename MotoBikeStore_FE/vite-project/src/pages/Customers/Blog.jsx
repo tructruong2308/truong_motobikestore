@@ -39,14 +39,14 @@ export default function Blog() {
         </div>
 
         {loading ? (
-          // Skeletons
-          <div className="grid md:grid-cols-3 gap-x-8 gap-y-12">
+          /* Skeletons */
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
                 className="rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm overflow-hidden"
               >
-                <div className="aspect-[16/9] w-full bg-slate-100 animate-pulse" />
+                <div style={{ aspectRatio: "16 / 9" }} className="w-full bg-slate-100 animate-pulse" />
                 <div className="p-6 space-y-3">
                   <div className="h-4 w-4/5 bg-slate-100 animate-pulse rounded" />
                   <div className="h-4 w-full bg-slate-100 animate-pulse rounded" />
@@ -56,24 +56,25 @@ export default function Blog() {
             ))}
           </div>
         ) : (
-          // Grid bài viết
-          <div className="grid md:grid-cols-3 gap-x-8 gap-y-12">
+          /* Grid bài viết */
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-12">
             {posts.map((p) => (
               <article
                 key={p.id || p.slug}
                 className="group h-full overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 shadow-sm transition-all duration-300 hover:-translate-y-[3px] hover:shadow-xl hover:ring-slate-300 hover:ring-offset-2 hover:ring-offset-slate-50"
               >
-                {/* Cover */}
-                <div className="relative overflow-hidden">
+                {/* Cover (KHÔNG cần plugin, dùng aspect-ratio thuần) */}
+                <div className="relative overflow-hidden" style={{ aspectRatio: "16 / 9" }}>
                   {p.thumbnail_url ? (
                     <img
                       src={p.thumbnail_url}
                       alt="thumb"
-                      className="aspect-[16/9] w-full object-cover transition-transform duration-500 group-hover:scale-[1.04]"
+                      style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                      className="transition-transform duration-500 group-hover:scale-[1.04]"
                       onError={(e) => (e.currentTarget.style.display = "none")}
                     />
                   ) : (
-                    <div className="aspect-[16/9] w-full bg-gradient-to-br from-slate-100 to-slate-200" />
+                    <div className="w-full h-full bg-gradient-to-br from-slate-100 to-slate-200" />
                   )}
 
                   {p.category?.name && (
