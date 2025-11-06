@@ -125,6 +125,7 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
     Route::delete('/posts/{post}',        [PostController::class, 'destroy']);
     Route::patch ('/posts/{post}/publish',[PostController::class, 'publish']);
     Route::patch ('/posts/{post}/unpublish',[PostController::class, 'unpublish']);
+    Route::post('/posts/upload', [PostController::class, 'uploadImage']);
 
     Route::post('/posts/import', [PostImportController::class, 'bulk']);
 });

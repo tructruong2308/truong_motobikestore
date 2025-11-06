@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 /* ====== Config ====== */
-const API_ROOT = import.meta.env.VITE_API_BASE?.replace(/\/+$/, "") || "http://127.0.0.1:8000/api";
+const API_ROOT = (import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
 const ADMIN_API = `${API_ROOT}/admin`;
 const ADMIN_TOKEN_KEY = "admin_token";
 const ADMIN_USER_KEY  = "admin_user";
@@ -43,10 +43,13 @@ const normalize = (p) => ({
   slug: p.slug ?? "",
   excerpt: p.excerpt ?? "",
   content: p.content ?? "",
-  thumbnail: p.thumbnail ?? p.thumbnail_url ?? "",
-  status: p.status ?? (p.published_at ? "published" : "draft"),
+  // hiển thị: hỗ trợ cả thumbnail_url / thumbnail
+  thumbnail: p.thumbnail_url ?? p.thumbnail ?? "",
+  // publish/unpublish dùng published_at
   published_at: p.published_at ?? null,
   created_at: p.created_at ?? p.createdAt ?? "",
+  source: p.source ?? "",
+  author: p.author ?? "",
 });
 
 const slugify = (s="") => s
@@ -73,6 +76,7 @@ export default function Posts(){
 
   const listEP = `${ADMIN_API}/posts`;
   const oneEP  = (id) => `${ADMIN_API}/posts/${id}`;
+  const uploadEP = `${ADMIN_API}/posts/upload`;
 
   async function load(){
     try{
@@ -97,7 +101,7 @@ export default function Posts(){
   const list = useMemo(()=> items, [items]);
 
   function openNew(){
-    setEditing({ id:0, title:"", slug:"", excerpt:"", content:"", thumbnail:"", status:"draft" });
+    setEditing({ id:0, title:"", slug:"", excerpt:"", content:"", thumbnail:"", published_at:null, source:"", author:"" });
   }
   function openEdit(it){ setEditing({...it}); }
 
@@ -110,8 +114,11 @@ export default function Posts(){
         slug: (editing.slug?.trim() || slugify(editing.title || "")),
         excerpt: editing.excerpt?.trim() || "",
         content: editing.content ?? "",
-        thumbnail: editing.thumbnail ?? "",
-        status: editing.status || "draft",
+        // quan trọng: GỬI LÊN BACKEND BẰNG KEY thumbnail_url
+        thumbnail_url: editing.thumbnail ?? "",
+        published_at: editing.published_at || null,
+        source: editing.source ?? "",
+        author: editing.author ?? "",
       };
       let r;
       if (editing.id){
@@ -144,14 +151,43 @@ export default function Posts(){
     }catch(e){ alert(e.message || "Lỗi"); }
   }
 
-  async function setStatus(it, to){ // 'published' | 'draft'
+  async function setPublished(it, publish){ // true->publish, false->unpublish
     try{
-      const ep = `${oneEP(it.id)}/${to === "published" ? "publish" : "unpublish"}`;
+      const ep = `${oneEP(it.id)}/${publish ? "publish" : "unpublish"}`;
       const r  = await fetch(ep, { method:"PATCH", headers:{ Accept:"application/json", ...authHeader() }});
       if (authFail(r.status)) return;
       if (!r.ok) throw new Error("Cập nhật trạng thái thất bại");
-      setItems(prev => prev.map(x => x.id === it.id ? { ...x, status: to } : x));
+      setItems(prev => prev.map(x => x.id === it.id ? { ...x, published_at: publish ? new Date().toISOString() : null } : x));
     }catch(e){ alert(e.message || "Lỗi"); }
+  }
+
+  /* ===== Upload ảnh thumbnail ===== */
+  async function handleUploadThumb(e){
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 4 * 1024 * 1024) {
+      alert("Ảnh quá 4MB"); e.target.value = ""; return;
+    }
+
+    const fd = new FormData();
+    fd.append("file", file);
+
+    try {
+      const res = await fetch(uploadEP, {
+        method: "POST",
+        headers: { ...authHeader() }, // KHÔNG set Content-Type
+        body: fd,
+      });
+      if (authFail(res.status)) return;
+      if (!res.ok) throw new Error("Upload thất bại");
+      const j = await res.json();
+      setEditing(v => ({ ...v, thumbnail: j.url })); // hiển thị xem trước + sẽ gửi lên bằng thumbnail_url
+    } catch (err) {
+      alert(err.message || "Upload lỗi");
+    } finally {
+      e.target.value = "";
+    }
   }
 
   return (
@@ -204,15 +240,21 @@ export default function Posts(){
                       </div>
                     </td>
                     <td><code>{it.slug}</code></td>
-                    <td>{it.status==="published" ? <span className="badge pub">Xuất bản</span> : <span className="badge draft">Nháp</span>}</td>
+                    <td>
+                      {it.published_at ? (
+                        <span className="badge pub">Đang xuất bản</span>
+                      ) : (
+                        <span className="badge draft">Nháp</span>
+                      )}
+                    </td>
                     <td>{it.created_at ? new Date(it.created_at).toLocaleString("vi-VN") : ""}</td>
                     <td align="center">
                       <button className="btn-text" onClick={()=> openEdit(it)}>Sửa</button>
                       <span style={{ opacity:.35, margin:"0 6px" }}>|</span>
-                      {it.status==="published" ? (
-                        <button className="btn-text" onClick={()=> setStatus(it, "draft")}>Gỡ xuống</button>
+                      {it.published_at ? (
+                        <button className="btn-text" onClick={()=> setPublished(it, false)}>Gỡ xuống</button>
                       ) : (
-                        <button className="btn-text" onClick={()=> setStatus(it, "published")}>Xuất bản</button>
+                        <button className="btn-text" onClick={()=> setPublished(it, true)}>Xuất bản</button>
                       )}
                       <span style={{ opacity:.35, margin:"0 6px" }}>|</span>
                       <button className="btn-danger" onClick={()=> remove(it.id)}>Xoá</button>
@@ -260,21 +302,38 @@ export default function Posts(){
                   <input className="input" value={editing.slug} onChange={e=> setEditing(v=> ({...v, slug:e.target.value}))}/>
                 </div>
                 <div>
-                  <label>Trạng thái</label>
-                  <select className="input" value={editing.status} onChange={e=> setEditing(v=> ({...v, status:e.target.value}))}>
-                    <option value="draft">Nháp</option>
-                    <option value="published">Xuất bản</option>
-                  </select>
+                  <label>Nguồn</label>
+                  <input className="input" value={editing.source} onChange={e=> setEditing(v=> ({...v, source:e.target.value}))}/>
+                </div>
+                <div>
+                  <label>Tác giả</label>
+                  <input className="input" value={editing.author} onChange={e=> setEditing(v=> ({...v, author:e.target.value}))}/>
+                </div>
+                <div>
+                  <label>Thời điểm xuất bản</label>
+                  <input
+                    className="input"
+                    type="datetime-local"
+                    value={editing.published_at ? new Date(editing.published_at).toISOString().slice(0,16) : ""}
+                    onChange={e=> setEditing(v=> ({...v, published_at: e.target.value ? new Date(e.target.value).toISOString() : null}))}
+                  />
                 </div>
                 <div className="col-span-2">
                   <label>Mô tả ngắn</label>
                   <input className="input" value={editing.excerpt} onChange={e=> setEditing(v=> ({...v, excerpt:e.target.value}))}/>
                 </div>
+
                 <div className="col-span-2">
                   <label>Ảnh thumbnail (URL)</label>
                   <input className="input" value={editing.thumbnail} onChange={e=> setEditing(v=> ({...v, thumbnail:e.target.value}))}/>
+                  <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:8 }}>
+                    <input id="thumb-file" type="file" accept="image/*" onChange={handleUploadThumb} style={{ display:"none" }} />
+                    <button className="btn" onClick={()=> document.getElementById('thumb-file').click()}>Chọn ảnh…</button>
+                    <small style={{ opacity:.7 }}>JPG/PNG/WEBP/AVIF ≤ 4MB</small>
+                  </div>
                   {editing.thumbnail && <img className="preview" src={editing.thumbnail} alt="" onError={(e)=> (e.currentTarget.style.display="none")} />}
                 </div>
+
                 <div className="col-span-2">
                   <label>Nội dung (HTML/Markdown)</label>
                   <textarea className="textarea" value={editing.content} onChange={e=> setEditing(v=> ({...v, content:e.target.value}))}/>

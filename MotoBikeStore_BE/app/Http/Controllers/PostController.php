@@ -6,6 +6,7 @@ use App\Models\Post;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Storage;
 
 class PostController extends Controller
 {
@@ -134,4 +135,22 @@ class PostController extends Controller
         $post->update(['published_at' => null]);
         return response()->json(['data' => $post]);
     }
+
+    public function uploadImage(Request $r)
+{
+    $r->validate([
+        'file' => 'required|file|mimes:jpg,jpeg,png,webp,avif,gif|max:4096', // ≤ 4MB
+    ]);
+
+    // Lưu vào storage/app/public/posts/...
+    $path = $r->file('file')->store('posts', 'public');
+
+    // Trả về URL public
+    $url  = asset('storage/'.$path);
+
+    return response()->json([
+        'url'  => $url,
+        'path' => $path, // nếu sau này muốn xoá bằng path
+    ]);
+}
 }
