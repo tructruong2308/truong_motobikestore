@@ -57,10 +57,15 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1000, display: "flex", justifyContent: "flex-end" }}>
-      <div style={{ width: "100%", maxWidth: 420, height: "100%", background: "#0b1220", color: "#e2e8f0",
-        borderLeft: "1px solid rgba(148,163,184,.2)", display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between",
-          padding: "12px 14px", borderBottom: "1px solid rgba(148,163,184,.2)", background: "rgba(2,6,23,.35)" }}>
+      {/* Panel LIGHT */}
+      <div style={{
+        width: "100%", maxWidth: 420, height: "100%", background: "#ffffff", color: "#0f172a",
+        borderLeft: "1px solid #e5e7eb", display: "flex", flexDirection: "column"
+      }}>
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 14px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc"
+        }}>
           <b>Chọn mã giảm giá</b>
           <button className="btn" onClick={onClose}>Đóng</button>
         </div>
@@ -79,7 +84,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
           <div style={{ display: "grid", gap: 10 }}>
             {/* Đủ điều kiện */}
             {list.filter(x => x.eligible).map(v => (
-              <div key={v.code} className="card" style={{ borderColor: "rgba(16,185,129,.35)" }}>
+              <div key={v.code} className="card" style={{ borderColor: "#86efac" }}>
                 <div className="card-bd" style={{ display: "grid", gap: 6 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
@@ -100,7 +105,7 @@ function VoucherDrawer({ open, onClose, subtotal, onPickCode }) {
             {list.some(x => !x.eligible) && <div className="muted" style={{ marginTop: 8 }}>Chưa đủ điều kiện</div>}
             {list.filter(x => !x.eligible).map(v => (
               <div key={v.code} className="card">
-                <div className="card-bd" style={{ display: "grid", gap: 6, opacity: .85 }}>
+                <div className="card-bd" style={{ display: "grid", gap: 6, opacity: .9 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                     <div>
                       <div style={{ fontWeight: 800 }}>{v.code}</div>
@@ -257,7 +262,6 @@ export default function Checkout({ cart = [], setCart }) {
   };
 
   /* =================== COUPON =================== */
-  // gọi BE validate (tái sử dụng cho tự động re-validate)
   const validateCoupon = async (code, currentSubtotal) => {
     const cleanCode = String(code || "").trim().toUpperCase();
     if (!cleanCode) throw new Error("EMPTY");
@@ -286,7 +290,6 @@ export default function Checkout({ cart = [], setCart }) {
     };
   };
 
-  // người dùng nhập tay
   const applyCoupon = async () => {
     const code = (coupon || "").trim().toUpperCase();
     if (!code) { setAppliedCoupon(null); clearSavedCoupon(); setMsg(""); return; }
@@ -303,7 +306,6 @@ export default function Checkout({ cart = [], setCart }) {
     }
   };
 
-  // khi chọn từ Drawer
   const applyCouponFromDrawer = async (code) => {
     setOpenVoucher(false);
     setCoupon(code);
@@ -431,7 +433,7 @@ export default function Checkout({ cart = [], setCart }) {
       localStorage.removeItem(LS_CHECKED);
       window.dispatchEvent(new Event("cart:refresh"));
 
-      // clear coupon sau khi đặt thành công (tuỳ policy)
+      // clear coupon sau khi đặt thành công
       clearCoupon();
 
       setMsg("✅ Đặt hàng thành công!");
@@ -444,39 +446,40 @@ export default function Checkout({ cart = [], setCart }) {
 
   /* =================== UI =================== */
   const css = `
+:root{--border:#e5e7eb;--text:#0f172a;--muted:#64748b}
 .co-shell{display:grid;grid-template-columns:1.5fr .9fr;gap:16px}
-@media (max-width: 1024px){.co-shell{grid-template-columns:1fr}}
-.card{border:1px solid rgba(148,163,184,.18);border-radius:14px;background:#0b1320}
-.card-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(148,163,184,.12);background:rgba(2,6,23,.35);border-top-left-radius:14px;border-top-right-radius:14px}
-.card-bd{padding:14px}
-.tag{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border:1px solid rgba(148,163,184,.25);border-radius:999px;background:rgba(2,6,23,.35);font-size:12px;color:#cbd5e1;font-weight:700}
+@media (max-width:1024px){.co-shell{grid-template-columns:1fr}}
+.card{border:1px solid var(--border);border-radius:14px;background:#ffffff;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.card-hd{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--border);background:#f8fafc;border-top-left-radius:14px;border-top-right-radius:14px;color:var(--text)}
+.card-bd{padding:14px;color:var(--text)}
+.tag{display:inline-flex;gap:6px;align-items:center;padding:4px 10px;border:1px solid var(--border);border-radius:999px;background:#f1f5f9;font-size:12px;color:var(--text);font-weight:700}
 .addr-grid{display:grid;gap:10px}
 .item{display:grid;grid-template-columns:64px 1fr auto;gap:10px;align-items:center}
-.item .thumb{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid rgba(148,163,184,.18);background:#0f172a}
-.item .name{font-weight:700;line-height:1.3}
-.line{border-top:1px dashed rgba(148,163,184,.2);margin:12px 0}
+.item .thumb{width:64px;height:64px;border-radius:12px;object-fit:cover;border:1px solid var(--border);background:#ffffff}
+.item .name{font-weight:700;line-height:1.3;color:var(--text)}
+.line{border-top:1px dashed var(--border);margin:12px 0}
 .row{display:flex;gap:10px;flex-wrap:wrap}
 .row.between{justify-content:space-between}
-.price{font-weight:800}
-.pm-row{display:grid;gap:8px;margin-top:8px}
+.price{font-weight:800;color:var(--text)}
+.pm-row{display:grid;gap:8px;margin-top:8px;color:var(--text)}
 .note{width:100%;min-height:100px}
-.sum{display:grid;gap:8px}
+.sum{display:grid;gap:8px;color:var(--text)}
 .sum .r{display:flex;justify-content:space-between}
-.sum .total{font-size:20px;font-weight:900;color:#34d399}
-.bar{position:sticky;bottom:12px;display:flex;gap:12px;align-items:center;justify-content:flex-end;padding:14px;border:1px solid rgba(148,163,184,.18);border-radius:14px;background:linear-gradient(180deg, rgba(2,6,23,.6), rgba(2,6,23,.45));backdrop-filter:blur(6px)}
-.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid rgba(148,163,184,.25);background:#0f172a;color:#e2e8f0;font-weight:800;cursor:pointer}
-.btn.primary{background:#14532d;border-color:#14532d}
-.warn{color:#f59e0b}
-.muted{color:#94a3b8}
+.sum .total{font-size:20px;font-weight:900;color:#16a34a}
+.bar{position:sticky;bottom:12px;display:flex;gap:12px;align-items:center;justify-content:flex-end;padding:14px;border:1px solid var(--border);border-radius:14px;background:#ffffff;box-shadow:0 8px 30px rgba(17,24,39,.06)}
+.btn{height:40px;padding:0 16px;border-radius:10px;border:1px solid var(--border);background:#ffffff;color:var(--text);font-weight:800;cursor:pointer;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.btn.primary{background:linear-gradient(180deg,#34d399,#10b981);border-color:#10b981;color:#ffffff;box-shadow:0 6px 18px rgba(16,185,129,.25)}
+.warn{color:#b45309}
+.muted{color:var(--muted)}
 .input{min-width:240px}
 .coupon{display:flex;gap:8px;align-items:center}
 .hint{display:flex;gap:8px;align-items:center;margin-top:8px}
   `;
 
   return (
-    <div className="checkoutX">
+    <div className="checkoutX" style={{ color: "#0f172a" }}>
       <style>{css}</style>
-      <h1 style={{ margin: 0, marginBottom: 8 }}>Thanh toán</h1>
+      <h1 style={{ margin: 0, marginBottom: 8, color: "#0f172a" }}>Thanh toán</h1>
 
       <div className="co-shell">
         {/* ========== Cột trái ========== */}
@@ -646,7 +649,7 @@ export default function Checkout({ cart = [], setCart }) {
 
           {/* Thanh xác nhận */}
           <div className="bar">
-            {msg && <div className="tag" style={{ background: "rgba(6,78,59,.25)" }}>{msg}</div>}
+            {msg && <div className="tag" style={{ background: "#ecfdf5", borderColor: "#86efac" }}>{msg}</div>}
             <button className="btn primary" onClick={submit} disabled={loading || !cartForCheckout.length}>
               {loading ? "Đang xử lý…" : form.payment_method === "momo" ? "Thanh toán MoMo" : "Đặt hàng COD"}
             </button>
