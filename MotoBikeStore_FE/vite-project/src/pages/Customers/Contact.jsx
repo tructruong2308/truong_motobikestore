@@ -28,55 +28,58 @@ export default function Contact() {
     }
   };
 
+  // helper: class nền xanh nhạt khi có value (giống ảnh bạn gửi)
+  const filled = (v) =>
+    (v?.trim()?.length ? "bg-indigo-50/70" : "bg-slate-50") +
+    " focus:bg-white transition-colors";
+
   return (
-    <main className="relative min-h-[70vh] flex justify-center">
-      {/* nền nhẹ + đảm bảo khối nằm giữa */}
+    <main className="relative min-h-[70vh] bg-white">
+      {/* nền nhẹ và căn giữa container */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 [mask-image:radial-gradient(60%_50%_at_50%_0%,#000_35%,transparent_80%)] bg-[radial-gradient(1200px_600px_at_50%_-10%,rgba(99,102,241,.08),transparent),linear-gradient(180deg,#fff,rgba(250,250,255,.6))]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1000px_500px_at_50%_-10%,rgba(99,102,241,.06),transparent)]"
       />
 
-      {/* Giữ input nền sáng dù site đang dark */}
+      {/* SCOPED: đảm bảo input luôn sáng */}
       <style>{`
         .contact-wrap input, .contact-wrap textarea, .contact-wrap select {
-          background: #fff !important; color: #0f172a !important; border-color: #e2e8f0 !important;
+          color:#0f172a !important; border-color:#e5e7eb !important;
         }
         .contact-wrap input:focus, .contact-wrap textarea:focus, .contact-wrap select:focus {
-          outline: none !important; box-shadow: 0 0 0 4px rgba(99,102,241,.15); border-color: #6366f1 !important;
+          outline:none !important; box-shadow:0 0 0 4px rgba(99,102,241,.14); border-color:#6366f1 !important;
         }
-        .form-row { display: grid; gap: 16px; }
-        @media (min-width: 768px) { .form-row { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+        .form-row { display:grid; gap:16px; }
+        @media (min-width:768px){ .form-row{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
       `}</style>
 
-      <section className="contact-wrap w-full max-w-5xl px-4 py-12">
-        {/* Header căn giữa */}
-        <div className="text-center mb-10">
+      <section className="contact-wrap max-w-4xl mx-auto px-4 py-10">
+        {/* Header */}
+        <div className="text-center mb-8">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-sm text-slate-600">
             ✉️ Liên hệ & Hỗ trợ
           </span>
           <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-slate-900">
-            Chúng tôi luôn sẵn sàng hỗ trợ bạn
+            Đăng ký hỗ trợ / liên hệ
           </h1>
-          <p className="mt-2 text-slate-600">
-            Có câu hỏi hay góp ý? Hãy để lại thông tin, chúng tôi sẽ phản hồi sớm nhất.
-          </p>
+          <p className="mt-2 text-slate-600">Nhập thông tin để chúng tôi phản hồi sớm.</p>
           <div className="mx-auto mt-6 h-[3px] w-24 rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
         </div>
 
-        {/* Lưới 2 cột: Form (trái) – Info (phải) */}
+        {/* GRID 2 cột: Form | Info */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* FORM CARD – chia ô theo hàng rõ ràng */}
+          {/* FORM CARD */}
           <form
             onSubmit={onSubmit}
-            className="rounded-2xl border border-slate-200 bg-white shadow-md p-6 md:p-8"
+            className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_-12px_rgba(2,6,23,.12)] p-6 md:p-8"
           >
-            {/* Hàng 1: Họ tên (full) */}
+            {/* Họ tên */}
             <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Họ tên <span className="text-rose-500">*</span>
-              </label>
+              <label className="block text-sm font-semibold text-slate-800 mb-2">Họ tên *</label>
               <input
-                className="w-full rounded-xl border px-4 py-3 placeholder-slate-400"
+                className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
+                  form.name
+                )} shadow-inner`}
                 placeholder="Nguyễn Văn A"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -84,15 +87,17 @@ export default function Contact() {
               />
             </div>
 
-            {/* Hàng 2: Email | Số điện thoại */}
+            {/* Email | Phone */}
             <div className="form-row mb-5">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Email <span className="text-rose-500">*</span>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  E-mail *
                 </label>
                 <input
                   type="email"
-                  className="w-full rounded-xl border px-4 py-3 placeholder-slate-400"
+                  className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
+                    form.email
+                  )} shadow-inner`}
                   placeholder="ban@email.com"
                   value={form.email}
                   onChange={(e) => setForm({ ...form, email: e.target.value })}
@@ -100,9 +105,13 @@ export default function Contact() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Số điện thoại</label>
+                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                  Số điện thoại
+                </label>
                 <input
-                  className="w-full rounded-xl border px-4 py-3 placeholder-slate-400"
+                  className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
+                    form.phone
+                  )} shadow-inner`}
                   placeholder="09xxxxxxxx"
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value })}
@@ -110,44 +119,46 @@ export default function Contact() {
               </div>
             </div>
 
-            {/* Hàng 3: Tiêu đề (full) */}
+            {/* Tiêu đề */}
             <div className="mb-5">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
+              <label className="block text-sm font-semibold text-slate-800 mb-2">
                 Tiêu đề <span className="text-slate-400">(tuỳ chọn)</span>
               </label>
               <input
-                className="w-full rounded-xl border px-4 py-3 placeholder-slate-400"
+                className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
+                  form.subject
+                )} shadow-inner`}
                 placeholder="Tóm tắt vấn đề của bạn"
                 value={form.subject}
                 onChange={(e) => setForm({ ...form, subject: e.target.value })}
               />
             </div>
 
-            {/* Hàng 4: Nội dung (full) */}
+            {/* Nội dung */}
             <div className="mb-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Nội dung <span className="text-rose-500">*</span>
-              </label>
+              <label className="block text-sm font-semibold text-slate-800 mb-2">Nội dung *</label>
               <textarea
                 rows={6}
-                className="w-full rounded-xl border px-4 py-3 placeholder-slate-400 leading-relaxed"
+                className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
+                  form.message
+                )} leading-relaxed`}
                 placeholder="Mô tả chi tiết vấn đề hoặc hỗ trợ bạn cần…"
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 required
               />
-              <div className="flex items-center justify-between text-xs text-slate-500 mt-1">
+              <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
                 <span>⏱️ Phản hồi trung bình: <b>1–3 giờ</b> (T2–CN)</span>
                 <span>{(form.message || "").length}/1000</span>
               </div>
             </div>
 
-            {/* Nút gửi + thông báo */}
-            <div className="flex items-center gap-3 pt-3">
+            {/* Submit */}
+            <div className="pt-4 flex items-center gap-3">
               <button
                 disabled={loading}
-                className={`inline-flex items-center justify-center h-11 px-5 rounded-xl text-white font-semibold shadow-sm transition
-                  ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800"}`}
+                className={`inline-flex items-center justify-center h-11 px-6 rounded-2xl text-white font-semibold shadow-sm transition
+                ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800"}`}
                 aria-busy={loading}
               >
                 {loading ? "Đang gửi..." : "Gửi yêu cầu"}
@@ -165,8 +176,8 @@ export default function Contact() {
           </form>
 
           {/* INFO CARD */}
-          <aside className="rounded-2xl border border-slate-200 bg-white shadow-md p-6 md:p-8">
-            <h2 className="text-xl font-semibold text-slate-900 mb-5">Thông tin cửa hàng</h2>
+          <aside className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_-12px_rgba(2,6,23,.12)] p-6 md:p-8">
+            <h2 className="text-xl font-bold text-slate-900 mb-5">Thông tin cửa hàng</h2>
             <ul className="space-y-4 text-slate-700">
               <li className="flex items-start gap-3">
                 <span className="mt-1">📧</span>
