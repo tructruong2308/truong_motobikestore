@@ -44,6 +44,7 @@ import ProductAdd from "./pages/Admin/Product/ProductAdd";
 import ProductEdit from "./pages/Admin/Product/ProductEdit";
 import AdminCoupons from "./pages/Admin/Coupon/Coupons";
 import AdminContacts from "./pages/Admin/Contact/Contacts";
+import AdminPosts from "./pages/Admin/Post/Posts";
 
 /* NEW: header search with suggestions */
 import HeaderSearch from "./components/HeaderSearch";
@@ -634,6 +635,7 @@ function App() {
             <Route path="users" element={<AdminUsers />} />
             <Route path="coupons" element={<AdminCoupons />} />
             <Route path="contacts" element={<AdminContacts />} />
+            <Route path="posts" element={<AdminPosts />} />
           </Route>
 
           {/* 404 */}

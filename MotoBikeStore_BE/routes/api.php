@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\PostImportController;
 
 
 /* ---------- PUBLIC ---------- */
@@ -116,6 +117,16 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
     // Nếu FE dùng 1 endpoint chung:
     // Route::patch ('/contacts/{contact}',       [ContactController::class, 'resolve']);
     Route::delete('/contacts/{contact}',       [ContactController::class, 'destroy']);
+
+    //post
+    Route::get   ('/posts',               [PostController::class, 'adminIndex']);
+    Route::post  ('/posts',               [PostController::class, 'store']);
+    Route::put   ('/posts/{post}',        [PostController::class, 'update']);
+    Route::delete('/posts/{post}',        [PostController::class, 'destroy']);
+    Route::patch ('/posts/{post}/publish',[PostController::class, 'publish']);
+    Route::patch ('/posts/{post}/unpublish',[PostController::class, 'unpublish']);
+
+    Route::post('/posts/import', [PostImportController::class, 'bulk']);
 });
 
 /* 404 */

@@ -117,23 +117,48 @@ export default function ContactsAdmin() {
     }
   }
 
-  async function markRead(id, read = true) {
-    // Ưu tiên endpoint /read /unread; fallback PUT
-    const actionUrl = `${oneEndpoint(id)}/${read ? "read" : "unread"}`;
-    let res = await fetch(actionUrl, { method: "POST", headers: { Accept: "application/json", ...authHeader() } });
+  /* ====== PATCH /read (hoặc fallback PATCH /{id} {status:'read'}) ====== */
+  async function markRead(id) {
+    let res = await fetch(`${oneEndpoint(id)}/read`, {
+      method: "PATCH",
+      headers: { Accept: "application/json", ...authHeader() },
+    });
+
     if (!res.ok) {
       res = await fetch(oneEndpoint(id), {
-        method: "PUT",
+        method: "PATCH",
         headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeader() },
-        body: JSON.stringify({ is_read: read ? 1 : 0 }),
+        body: JSON.stringify({ status: "read" }),
       });
     }
+
     if (handleAuthFail(res.status)) return;
+    if (!res.ok) return alert("❌ Đánh dấu đã đọc thất bại");
+
+    setItems((prev) =>
+      prev.map((x) => (x.id === id ? { ...x, is_read: true, read_at: new Date().toISOString() } : x))
+    );
+  }
+
+  /* ====== PATCH /done (hoặc fallback PATCH /{id} {status:'done'}) ====== */
+  async function markDone(id) {
+    let res = await fetch(`${oneEndpoint(id)}/done`, {
+      method: "PATCH",
+      headers: { Accept: "application/json", ...authHeader() },
+    });
+
     if (!res.ok) {
-      alert("❌ Cập nhật trạng thái thất bại");
-      return;
+      res = await fetch(oneEndpoint(id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Accept: "application/json", ...authHeader() },
+        body: JSON.stringify({ status: "done" }),
+      });
     }
-    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, is_read: read, read_at: read ? new Date().toISOString() : null } : x)));
+
+    if (handleAuthFail(res.status)) return;
+    if (!res.ok) return alert("❌ Đánh dấu đã xử lý thất bại");
+
+    setItems((prev) => prev.map((x) => (x.id === id ? { ...x, is_read: true } : x)));
   }
 
   async function removeContact(id) {
@@ -236,8 +261,12 @@ export default function ContactsAdmin() {
                     <td align="center">
                       <button className="btn-text" onClick={() => setOpenId(m.id)}>Xem</button>
                       <span style={{ opacity: 0.35, margin: "0 6px" }}>|</span>
-                      <button className="btn-text" onClick={() => markRead(m.id, !m.is_read)}>
-                        {m.is_read ? "Đánh dấu chưa đọc" : "Đánh dấu đã đọc"}
+                      {/* Toggle: nếu chưa đọc -> đánh dấu đã đọc; nếu đã đọc -> đánh dấu đã xử lý */}
+                      <button
+                        className="btn-text"
+                        onClick={() => (m.is_read ? markDone(m.id) : markRead(m.id))}
+                      >
+                        {m.is_read ? "Đánh dấu đã xử lý" : "Đánh dấu đã đọc"}
                       </button>
                       <span style={{ opacity: 0.35, margin: "0 6px" }}>|</span>
                       <button className="btn-danger" onClick={() => removeContact(m.id)}>Xoá</button>
@@ -285,8 +314,11 @@ export default function ContactsAdmin() {
                 >
                   Trả lời email
                 </a>
-                <button className="btn" onClick={() => markRead(opened.id, !opened.is_read)}>
-                  {opened.is_read ? "Đánh dấu chưa đọc" : "Đánh dấu đã đọc"}
+                <button
+                  className="btn"
+                  onClick={() => (opened.is_read ? markDone(opened.id) : markRead(opened.id))}
+                >
+                  {opened.is_read ? "Đánh dấu đã xử lý" : "Đánh dấu đã đọc"}
                 </button>
                 <button className="btn-danger" onClick={() => { setOpenId(null); removeContact(opened.id); }}>
                   Xoá

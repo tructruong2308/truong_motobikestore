@@ -1,6 +1,14 @@
 // src/components/AdminSidebar.jsx
 import { NavLink } from "react-router-dom";
-import { FiHome, FiBox, FiTag, FiShoppingCart, FiUsers, FiMail } from "react-icons/fi"; // 👈 thêm FiMail
+import {
+  FiHome,
+  FiBox,
+  FiTag,
+  FiShoppingCart,
+  FiUsers,
+  FiMail,
+  FiFileText,      // 👈 icon Tin Tức
+} from "react-icons/fi";
 import { LuTicketPercent } from "react-icons/lu"; // voucher %
 
 const styles = `
@@ -55,6 +63,9 @@ export default function AdminSidebar() {
         </NavLink>
         <NavLink to="/admin/contacts" style={linkStyle} className={({isActive})=>isActive?"active":""}>
           <FiMail /> Liên Hệ
+        </NavLink>
+        <NavLink to="/admin/posts" style={linkStyle} className={({isActive})=>isActive?"active":""}>
+          <FiFileText /> Tin Tức
         </NavLink>
       </nav>
     </div>

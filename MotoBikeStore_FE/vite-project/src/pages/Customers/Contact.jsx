@@ -28,54 +28,72 @@ export default function Contact() {
     }
   };
 
-  // helper: class nền xanh nhạt khi có value (giống ảnh bạn gửi)
+  // nền nhạt khi có value
   const filled = (v) =>
-    (v?.trim()?.length ? "bg-indigo-50/70" : "bg-slate-50") +
-    " focus:bg-white transition-colors";
+    (v?.trim()?.length ? "bg-indigo-50/70" : "bg-slate-50") + " focus:bg-white transition-colors";
 
   return (
     <main className="relative min-h-[70vh] bg-white">
-      {/* nền nhẹ và căn giữa container */}
+      {/* background mềm và căn giữa */}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(1000px_500px_at_50%_-10%,rgba(99,102,241,.06),transparent)]"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(900px_480px_at_50%_-10%,rgba(99,102,241,.06),transparent)]"
       />
 
-      {/* SCOPED: đảm bảo input luôn sáng */}
+      {/* SCOPED: đảm bảo input/textarea sáng, focus rõ ràng */}
       <style>{`
-        .contact-wrap input, .contact-wrap textarea, .contact-wrap select {
+        .contact-wrap input, .contact-wrap textarea, .contact-wrap select{
           color:#0f172a !important; border-color:#e5e7eb !important;
         }
-        .contact-wrap input:focus, .contact-wrap textarea:focus, .contact-wrap select:focus {
+        .contact-wrap input:focus, .contact-wrap textarea:focus, .contact-wrap select:focus{
           outline:none !important; box-shadow:0 0 0 4px rgba(99,102,241,.14); border-color:#6366f1 !important;
         }
-        .form-row { display:grid; gap:16px; }
+        .form-row{ display:grid; gap:16px; }
         @media (min-width:768px){ .form-row{ grid-template-columns:repeat(2,minmax(0,1fr)); } }
       `}</style>
 
-      <section className="contact-wrap max-w-4xl mx-auto px-4 py-10">
+      <section className="contact-wrap max-w-5xl mx-auto px-4 py-12">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-10">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-sm text-slate-600">
             ✉️ Liên hệ & Hỗ trợ
           </span>
           <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-slate-900">
             Đăng ký hỗ trợ / liên hệ
           </h1>
-          <p className="mt-2 text-slate-600">Nhập thông tin để chúng tôi phản hồi sớm.</p>
-          <div className="mx-auto mt-6 h-[3px] w-24 rounded-full bg-gradient-to-r from-indigo-500 via-violet-500 to-sky-500" />
+          <p className="mt-2 text-slate-600 max-w-2xl mx-auto">
+            Nhập thông tin để chúng tôi phản hồi sớm. Thời gian phản hồi trung bình: <b>1–3 giờ</b>.
+          </p>
+          <div className="mx-auto mt-6 h-[3px] w-28 rounded-full bg-gradient-to-r from-emerald-400 via-sky-400 to-indigo-400" />
         </div>
 
-        {/* GRID 2 cột: Form | Info */}
+        {/* Grid: Form | Info */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* FORM CARD */}
+          {/* FORM */}
           <form
             onSubmit={onSubmit}
-            className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_-12px_rgba(2,6,23,.12)] p-6 md:p-8"
+            className="rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_-16px_rgba(2,6,23,.12)] p-6 md:p-8"
           >
+            {/* Thông báo kết quả */}
+            {msg && (
+              <div
+                className={`mb-5 rounded-2xl border px-4 py-3 text-sm ${
+                  msg.startsWith("✅")
+                    ? "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    : "bg-rose-50 border-rose-200 text-rose-700"
+                }`}
+                role="status"
+                aria-live="polite"
+              >
+                {msg}
+              </div>
+            )}
+
             {/* Họ tên */}
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-800 mb-2">Họ tên *</label>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-slate-700 mb-2">
+                Họ tên *
+              </label>
               <input
                 className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
                   form.name
@@ -90,7 +108,7 @@ export default function Contact() {
             {/* Email | Phone */}
             <div className="form-row mb-5">
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                <label className="block text-[13px] font-semibold tracking-wide uppercase text-slate-700 mb-2">
                   E-mail *
                 </label>
                 <input
@@ -105,7 +123,7 @@ export default function Contact() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-semibold text-slate-800 mb-2">
+                <label className="block text-[13px] font-semibold tracking-wide uppercase text-slate-700 mb-2">
                   Số điện thoại
                 </label>
                 <input
@@ -121,8 +139,8 @@ export default function Contact() {
 
             {/* Tiêu đề */}
             <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-800 mb-2">
-                Tiêu đề <span className="text-slate-400">(tuỳ chọn)</span>
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-slate-700 mb-2">
+                Tiêu đề <span className="normal-case text-slate-400">(tuỳ chọn)</span>
               </label>
               <input
                 className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
@@ -135,8 +153,10 @@ export default function Contact() {
             </div>
 
             {/* Nội dung */}
-            <div className="mb-2">
-              <label className="block text-sm font-semibold text-slate-800 mb-2">Nội dung *</label>
+            <div className="mb-1">
+              <label className="block text-[13px] font-semibold tracking-wide uppercase text-slate-700 mb-2">
+                Nội dung *
+              </label>
               <textarea
                 rows={6}
                 className={`w-full rounded-2xl border px-4 py-3 placeholder-slate-400 ${filled(
@@ -148,13 +168,13 @@ export default function Contact() {
                 required
               />
               <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
-                <span>⏱️ Phản hồi trung bình: <b>1–3 giờ</b> (T2–CN)</span>
+                <span>Gợi ý: nêu rõ mẫu xe / thời gian / nội dung cần hỗ trợ.</span>
                 <span>{(form.message || "").length}/1000</span>
               </div>
             </div>
 
             {/* Submit */}
-            <div className="pt-4 flex items-center gap-3">
+            <div className="pt-5 flex items-center gap-3">
               <button
                 disabled={loading}
                 className={`inline-flex items-center justify-center h-11 px-6 rounded-2xl text-white font-semibold shadow-sm transition
@@ -163,20 +183,12 @@ export default function Contact() {
               >
                 {loading ? "Đang gửi..." : "Gửi yêu cầu"}
               </button>
-              {msg && (
-                <span
-                  role="status"
-                  aria-live="polite"
-                  className={`text-sm ${msg.startsWith("✅") ? "text-emerald-600" : "text-rose-600"}`}
-                >
-                  {msg}
-                </span>
-              )}
+              <span className="text-xs text-slate-500">Chúng tôi sẽ phản hồi qua email/điện thoại.</span>
             </div>
           </form>
 
-          {/* INFO CARD */}
-          <aside className="rounded-3xl border border-slate-200 bg-white shadow-[0_10px_30px_-12px_rgba(2,6,23,.12)] p-6 md:p-8">
+          {/* INFO */}
+          <aside className="rounded-3xl border border-slate-200 bg-white shadow-[0_12px_40px_-16px_rgba(2,6,23,.12)] p-6 md:p-8">
             <h2 className="text-xl font-bold text-slate-900 mb-5">Thông tin cửa hàng</h2>
             <ul className="space-y-4 text-slate-700">
               <li className="flex items-start gap-3">
