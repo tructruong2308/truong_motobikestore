@@ -46,7 +46,7 @@ export default function BlogDetail() {
 
   return (
     <main className="bg-gradient-to-b from-white to-slate-50/60">
-      <section className="max-w-6xl mx-auto px-4 py-10 md:py-14">
+      <section className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 pb-10 md:pb-14">
         {/* Breadcrumb */}
         <nav className="text-sm mb-6 md:mb-8 text-slate-500 flex items-center gap-2">
           <Link to="/" className="hover:text-slate-700 transition">Trang chủ</Link>
@@ -88,55 +88,67 @@ export default function BlogDetail() {
 
           {/* Content */}
           <article className="p-5 md:p-8">
-            {/* Tinh chỉnh hiển thị để đều – đẹp */}
             <style>{`
-              /* Khối nội dung chính: giới hạn độ rộng & typography */
+              /* Khối đọc gọn & đều */
               .reading{
-                max-width: 72ch;               /* ~72 ký tự/dòng: cân đối */
+                max-width: 70ch;
                 margin-inline: auto;
                 color:#0f172a;
                 letter-spacing:.1px;
               }
-              @media (min-width:768px){ .reading{ font-size:18px; line-height:1.9 } }
-              @media (max-width:767.9px){ .reading{ font-size:16px; line-height:1.8 } }
+              @media (min-width:768px){ .reading{ font-size:18px; line-height:1.85 } }
+              @media (max-width:767.9px){ .reading{ font-size:16px; line-height:1.75 } }
 
-              /* Đoạn văn canh đều + khoảng thở đồng nhất */
+              /* Đoạn văn: justify ở desktop, mobile left-align cho mượt */
               .reading p{
-                margin:0 0 1.1em 0;
-                text-align:justify;
-                text-justify:inter-word;
-                hyphens:auto;
+                margin:0 0 1.05em 0;
+                overflow-wrap:anywhere;
+              }
+              @media (min-width:1024px){
+                .reading p{
+                  text-align:justify;
+                  text-justify:inter-word;
+                  hyphens:auto;
+                }
               }
 
-              /* Tiêu đề mục rõ ràng, cách đều */
+              /* Tiêu đề mục */
               .reading h2{
                 font-size:1.45em; font-weight:800; line-height:1.3;
                 margin:2.1em 0 .9em 0; color:#0f172a; text-wrap:balance;
               }
               .reading h3{
-                font-size:1.25em; font-weight:800; line-height:1.35;
-                margin:1.7em 0 .7em 0;
+                font-size:1.24em; font-weight:800; line-height:1.35;
+                margin:1.6em 0 .7em 0;
               }
 
-              /* Ảnh trong bài: bo góc + viền + khoảng cách đều */
+              /* Ảnh trong bài: không méo, không phình */
               .reading img{
-                display:block; width:100%; height:auto;
-                margin:1.25rem 0;
-                border-radius:14px; border:1px solid #e2e8f0;
+                display:block;
+                width:100%;
+                height:auto;                 /* tránh méo */
+                max-height:520px;            /* tránh phình quá cao */
+                object-fit:cover;
+                object-position:center;
+                margin:1.1rem 0;
+                border-radius:14px;
+                border:1px solid #e2e8f0;
                 box-shadow:0 8px 22px rgba(15,23,42,.06);
               }
-              .reading figure{ margin:1.25rem 0 }
-              .reading figcaption{ font-size:.85rem; color:#64748b; text-align:center; margin-top:.35rem }
+              .reading figure{ margin:1.1rem 0 }
+              .reading figcaption{
+                font-size:.85rem; color:#64748b; text-align:center; margin-top:.35rem
+              }
 
               /* Danh sách & trích dẫn */
-              .reading ul, .reading ol{ padding-left:1.2rem; margin:.75rem 0 1rem 0 }
+              .reading ul, .reading ol{ padding-left:1.2rem; margin:.6rem 0 .9rem 0 }
               .reading li{ margin:.25rem 0 }
               .reading blockquote{
-                margin:1.25rem 0; padding:.6rem 1rem;
+                margin:1.1rem 0; padding:.6rem 1rem;
                 border-left:4px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:.5rem;
               }
 
-              /* Bảng & code inline */
+              /* Bảng & code */
               .reading table{ width:100%; border-collapse:collapse; font-size:.95em; margin:1rem 0 }
               .reading th, .reading td{ border:1px solid #e2e8f0; padding:.6rem .7rem; text-align:left }
               .reading code{
@@ -144,7 +156,7 @@ export default function BlogDetail() {
                 font-size:.92em;
               }
 
-              /* Liên kết */
+              /* Link */
               .reading a{ color:#0ea5e9; text-decoration:none }
               .reading a:hover{ text-decoration:underline }
             `}</style>
