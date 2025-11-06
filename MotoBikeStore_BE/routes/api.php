@@ -34,7 +34,6 @@ Route::post('/posts', [PostController::class, 'store']); // dùng cho n8n import
 
 /* 💬 LIÊN HỆ / HỖ TRỢ */
 Route::post('/contact', [ContactController::class, 'store']);
-Route::get('/contact',  [ContactController::class, 'index']); // optional: admin xem danh sách
 
 /* MoMo public callbacks */
 Route::get ('/payments/momo/return', [PaymentController::class, 'momoReturn']);
@@ -108,6 +107,12 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
     Route::put   ('/coupons/{id}',       [CouponController::class, 'update']);
     Route::delete('/coupons/{id}',       [CouponController::class, 'destroy']);
     Route::patch ('/coupons/{id}/toggle',[CouponController::class, 'toggle']);
+
+    // Contacts (ADMIN) – thêm mới
+    Route::get   ('/contacts',            [ContactController::class, 'index']);
+    Route::get   ('/contacts/{id}',       [ContactController::class, 'show']);
+    Route::patch ('/contacts/{id}/resolve',[ContactController::class, 'resolve']); // đánh dấu đã xử lý
+    Route::delete('/contacts/{id}',       [ContactController::class, 'destroy']);
 
 });
 
