@@ -64,7 +64,7 @@ export default function BlogDetail() {
         </h1>
 
         {/* Meta */}
-        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px]">
+        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px] meta-gap">
           {post.source && <span className="mr-2">Nguồn: <b className="text-slate-800">{post.source}</b></span>}
           {post.author && <span className="mx-2">• Tác giả: <b className="text-slate-800">{post.author}</b></span>}
           {post.published_at && (
@@ -81,17 +81,17 @@ export default function BlogDetail() {
             <img
               src={post.thumbnail_url}
               alt="thumb"
-              className="w-full max-h-[460px] object-cover"
+              className="w-full max-h-[460px] object-cover cover-img"
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
           )}
 
           {/* Content */}
           <article className="p-5 md:p-8">
-            {/* Typography tuning – giống báo/đọc dài, dễ nhìn */}
             <style>{`
-              .reading { 
-                max-width: 68ch;               /* chiều rộng dòng ~70 ký tự */
+              /* Vùng đọc: báo chí, dễ đọc */
+              .reading{ 
+                max-width: 72ch;             /* ~72 ký tự/ dòng */
                 margin-inline: auto;
                 color: #0f172a;
                 letter-spacing: .1px;
@@ -102,9 +102,12 @@ export default function BlogDetail() {
               @media (max-width: 767.9px){
                 .reading{ font-size: 16px; line-height: 1.8; }
               }
+              .meta-gap{ margin-top: .35rem; }
+              .cover-img{ box-shadow: 0 10px 24px rgba(15,23,42,.08); }
+
               .reading p{
                 margin: 0 0 1.1em 0;
-                text-align: justify;          /* canh đều giống ảnh bạn gửi */
+                text-align: justify;
                 text-justify: inter-word;
                 hyphens: auto;
               }
@@ -155,7 +158,6 @@ export default function BlogDetail() {
               .reading a:hover{ text-decoration:underline }
             `}</style>
 
-            {/* Nội dung (giữ nguyên cơ chế render) */}
             <div
               className="reading"
               dangerouslySetInnerHTML={{
