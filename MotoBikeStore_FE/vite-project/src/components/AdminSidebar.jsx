@@ -1,7 +1,7 @@
 // src/components/AdminSidebar.jsx
 import { NavLink } from "react-router-dom";
-import { FiHome, FiBox, FiTag, FiShoppingCart, FiUsers } from "react-icons/fi";
-import { LuTicketPercent } from "react-icons/lu"; // 👈 Icon voucher % (Lucide)
+import { FiHome, FiBox, FiTag, FiShoppingCart, FiUsers, FiMail } from "react-icons/fi"; // 👈 thêm FiMail
+import { LuTicketPercent } from "react-icons/lu"; // voucher %
 
 const styles = `
 .admin-sidebar{ height:100%; padding:16px; background:#0b0f1a; color:var(--text) }
@@ -54,7 +54,7 @@ export default function AdminSidebar() {
           <LuTicketPercent /> Mã Giảm Giá
         </NavLink>
         <NavLink to="/admin/contacts" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <LuTicketPercent /> Liên Hệ
+          <FiMail /> Liên Hệ
         </NavLink>
       </nav>
     </div>
