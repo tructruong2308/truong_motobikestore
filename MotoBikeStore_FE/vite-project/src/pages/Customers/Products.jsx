@@ -99,13 +99,11 @@ export default function Products() {
   }, []);
 
   // ---------- URL <-> state q ----------
-  // Lấy q từ URL khi vào /products hoặc khi điều hướng từ header
   useEffect(() => {
     const kw = searchParams.get("q") || "";
     setQ(kw);
   }, [searchParams]);
 
-  // Khi gõ trong ô tìm của trang Products thì cập nhật URL (debounce)
   useEffect(() => {
     const t = setTimeout(() => {
       const cur = searchParams.get("q") || "";
@@ -187,7 +185,7 @@ export default function Products() {
 
   // ---------- UI ----------
   return (
-    <div className="page-wrap product-page">
+    <div className="page-wrap product-page" style={{ background: "#ffffff", color: "#0f172a" }}>
       {/* Toolbar */}
       <div
         className="u-card u-border"
@@ -197,16 +195,20 @@ export default function Products() {
           gridTemplateColumns: "1fr auto auto",
           gap: 10,
           alignItems: "center",
+          background: "#ffffff",
+          border: "1px solid #e5e7eb",
+          borderRadius: 14,
+          boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 8px 30px rgba(17,24,39,.06)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <h2 style={{ margin: 0, color: "var(--txt-inv,#eaf5ff)" }}>Tất cả sản phẩm</h2>
+          <h2 style={{ margin: 0, color: "#0f172a" }}>Tất cả sản phẩm</h2>
           <span
             className="u-chip"
             style={{
-              background: "rgba(33,202,185,.18)",
-              borderColor: "rgba(33,202,185,.35)",
-              color: "#21cab9",
+              background: "#f1f5f9",
+              borderColor: "#e5e7eb",
+              color: "#0f172a",
               fontWeight: 800,
             }}
           >
@@ -216,9 +218,9 @@ export default function Products() {
             <span
               className="u-chip"
               style={{
-                background: "rgba(104,117,245,.18)",
-                borderColor: "rgba(104,117,245,.35)",
-                color: "#6875F5",
+                background: "#eef2ff",
+                borderColor: "#e0e7ff",
+                color: "#3730a3",
                 fontWeight: 700,
               }}
             >
@@ -232,13 +234,27 @@ export default function Products() {
           placeholder="🔍 Tìm sản phẩm…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{ minWidth: 220 }}
+          style={{
+            minWidth: 220,
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            color: "#0f172a",
+            height: 40,
+            borderRadius: 10,
+          }}
         />
 
         <select
           className="u-input"
           value={sort}
           onChange={(e) => setSort(e.target.value)}
+          style={{
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
+            color: "#0f172a",
+            height: 40,
+            borderRadius: 10,
+          }}
         >
           <option value="new">Mới nhất</option>
           <option value="name_asc">Tên A→Z</option>
@@ -258,13 +274,30 @@ export default function Products() {
           }}
         >
           {Array.from({ length: 8 }).map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: 260, borderRadius: 16 }} />
+            <div
+              key={i}
+              className="skeleton"
+              style={{
+                height: 260,
+                borderRadius: 16,
+                background:
+                  "linear-gradient(90deg,#f1f5f9 25%,#e5e7eb 37%,#f1f5f9 63%)",
+                backgroundSize: "400% 100%",
+                animation: "sweep 1.2s ease-in-out infinite",
+              }}
+            />
           ))}
+          <style>{`
+            @keyframes sweep {
+              0% { background-position: 100% 0 }
+              100% { background-position: 0 0 }
+            }
+          `}</style>
         </div>
       ) : err && items.length === 0 ? (
-        <p style={{ padding: 20, color: "#d32f2f" }}>{err}</p>
+        <p style={{ padding: 20, color: "#b91c1c" }}>{err}</p>
       ) : !items.length ? (
-        <p style={{ padding: 20 }}>Chưa có sản phẩm.</p>
+        <p style={{ padding: 20, color: "#334155" }}>Chưa có sản phẩm.</p>
       ) : (
         <div
           className="products-grid"
@@ -289,7 +322,16 @@ export default function Products() {
       )}
 
       <p style={{ marginTop: 24, textAlign: "center" }}>
-        <Link to="/" style={{ color: "var(--brand,#21cab9)" }}>← Về trang chủ</Link>
+        <Link
+          to="/"
+          style={{
+            color: "#2563eb",
+            textDecoration: "none",
+            fontWeight: 700,
+          }}
+        >
+          ← Về trang chủ
+        </Link>
       </p>
     </div>
   );

@@ -142,10 +142,11 @@ export default function HeaderSearch() {
             minWidth: 220,
             padding: "8px 12px",
             borderRadius: 10,
-            border: "1px solid #0f172a",
-            background: "#0b1220",
-            color: "#e2e8f0",
+            border: "1px solid #e5e7eb",
+            background: "#ffffff",
+            color: "#0f172a",
             width: "100%",
+            boxShadow: "inset 0 1px 2px rgba(0,0,0,.03)",
           }}
         />
         <button
@@ -154,11 +155,12 @@ export default function HeaderSearch() {
             height: 38,
             padding: "0 12px",
             borderRadius: 10,
-            border: "1px solid #0f172a",
+            border: "1px solid #10b981",
             background: "#10b981",
-            color: "#06141f",
+            color: "#ffffff",
             fontWeight: 800,
             cursor: "pointer",
+            boxShadow: "0 1px 2px rgba(0,0,0,.05)",
           }}
         >
           Tìm
@@ -173,10 +175,10 @@ export default function HeaderSearch() {
             top: 48,
             left: 0,
             right: 0,
-            background: "#0b1220",
-            border: "1px solid #0f172a",
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
             borderRadius: 12,
-            boxShadow: "0 10px 30px rgba(0,0,0,.35)",
+            boxShadow: "0 10px 30px rgba(17,24,39,.08)",
             zIndex: 2000,
             maxHeight: 360,
             overflowY: "auto",
@@ -184,13 +186,13 @@ export default function HeaderSearch() {
           }}
         >
           {loading && (
-            <div style={{ padding: "10px 12px", color: "#94a3b8", fontStyle: "italic" }}>
+            <div style={{ padding: "10px 12px", color: "#64748b", fontStyle: "italic" }}>
               Đang tìm…
             </div>
           )}
 
           {!loading && !items.length && (
-            <div style={{ padding: "10px 12px", color: "#94a3b8" }}>
+            <div style={{ padding: "10px 12px", color: "#64748b" }}>
               Không có gợi ý. Nhấn Enter để tìm “{q.trim()}”.
             </div>
           )}
@@ -212,9 +214,8 @@ export default function HeaderSearch() {
                   padding: "8px 10px",
                   borderRadius: 10,
                   cursor: "pointer",
-                  background: i === idx ? "rgba(16,185,129,.12)" : "transparent",
-                  border:
-                    i === idx ? "1px solid rgba(16,185,129,.25)" : "1px solid transparent",
+                  background: i === idx ? "rgba(16,185,129,.10)" : "transparent",
+                  border: i === idx ? "1px solid rgba(16,185,129,.25)" : "1px solid transparent",
                 }}
               >
                 <img
@@ -226,14 +227,15 @@ export default function HeaderSearch() {
                     height: 42,
                     objectFit: "cover",
                     borderRadius: 8,
-                    border: "1px solid #0f172a",
+                    border: "1px solid #e5e7eb",
+                    background: "#fff",
                   }}
                 />
                 <div style={{ minWidth: 0 }}>
                   <div
                     title={it.name}
                     style={{
-                      color: "#e2e8f0",
+                      color: "#0f172a",
                       whiteSpace: "nowrap",
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -242,9 +244,9 @@ export default function HeaderSearch() {
                   >
                     {it.name}
                   </div>
-                  <div style={{ color: "#9ca3af", fontSize: 12 }}>Nhấn Enter để xem</div>
+                  <div style={{ color: "#94a3b8", fontSize: 12 }}>Nhấn Enter để xem</div>
                 </div>
-                <div style={{ color: "#34d399", fontWeight: 800 }}>{money(it.price)}</div>
+                <div style={{ color: "#059669", fontWeight: 800 }}>{money(it.price)}</div>
               </div>
             ))}
 
@@ -255,10 +257,11 @@ export default function HeaderSearch() {
               style={{
                 marginTop: 4,
                 padding: "10px 12px",
-                borderTop: "1px dashed #0f172a",
-                color: "#67e8f9",
+                borderTop: "1px dashed #e5e7eb",
+                color: "#2563eb",
                 cursor: "pointer",
                 borderRadius: 8,
+                fontWeight: 700,
               }}
             >
               Tìm “{q.trim()}” trong tất cả sản phẩm →
