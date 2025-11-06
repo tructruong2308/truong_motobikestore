@@ -45,8 +45,8 @@ export default function BlogDetail() {
     );
 
   return (
-    <main className="bg-gradient-to-b from-white to-slate-50/60">
-      <section className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 pb-10 md:pb-14">
+    <main className="bg-gradient-to-b from-white to-slate-50/70">
+      <section className="max-w-6xl mx-auto px-4 pt-6 md:pt-10 pb-12 md:pb-16">
         {/* Breadcrumb */}
         <nav className="text-sm mb-6 md:mb-8 text-slate-500 flex items-center gap-2">
           <Link to="/" className="hover:text-slate-700 transition">Trang chủ</Link>
@@ -57,14 +57,14 @@ export default function BlogDetail() {
         </nav>
 
         {/* Title */}
-        <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+        <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight">
           <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-sky-500 bg-clip-text text-transparent">
             {post.title}
           </span>
         </h1>
 
         {/* Meta */}
-        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px]">
+        <p className="mt-3 md:mt-4 text-slate-600 text-[13.5px] md:text-[15px]">
           {post.source && <span className="mr-2">Nguồn: <b className="text-slate-800">{post.source}</b></span>}
           {post.author && <span className="mx-2">• Tác giả: <b className="text-slate-800">{post.author}</b></span>}
           {post.published_at && (
@@ -75,7 +75,7 @@ export default function BlogDetail() {
         </p>
 
         {/* Article card */}
-        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-[0_10px_30px_rgba(2,6,23,.06)] overflow-hidden">
           {/* Cover */}
           {post.thumbnail_url && (
             <img
@@ -88,77 +88,95 @@ export default function BlogDetail() {
 
           {/* Content */}
           <article className="p-5 md:p-8">
+            {/* --- STYLE TUNING: mạnh tay để khác biệt rõ --- */}
             <style>{`
-              /* Khối đọc gọn & đều */
+              /* Container đọc: width tối ưu + type scale responsive */
               .reading{
-                max-width: 70ch;
+                max-width: 68ch;
                 margin-inline: auto;
                 color:#0f172a;
-                letter-spacing:.1px;
+                font-size: clamp(1rem, .94rem + .35vw, 1.12rem);
+                line-height: 1.9;
+                letter-spacing:.12px;
               }
-              @media (min-width:768px){ .reading{ font-size:18px; line-height:1.85 } }
-              @media (max-width:767.9px){ .reading{ font-size:16px; line-height:1.75 } }
 
-              /* Đoạn văn: justify ở desktop, mobile left-align cho mượt */
+              /* Đoạn văn có nhịp, khoảng trắng rộng */
               .reading p{
-                margin:0 0 1.05em 0;
+                margin: 0 0 1.15em 0;
                 overflow-wrap:anywhere;
-              }
-              @media (min-width:1024px){
-                .reading p{
-                  text-align:justify;
-                  text-justify:inter-word;
-                  hyphens:auto;
-                }
+                text-align: justify;
+                text-justify: inter-word;
+                hyphens: auto;
               }
 
-              /* Tiêu đề mục */
+              /* Drop-cap đoạn đầu: nhìn "tạp chí" hơn */
+              .reading p:first-of-type::first-letter{
+                float:left;
+                font-size: 3.2em;
+                line-height:.9;
+                padding:.08em .14em 0 0;
+                font-weight:800;
+                color:#0f172a;
+              }
+
+              /* Heading rõ nhịp */
               .reading h2{
-                font-size:1.45em; font-weight:800; line-height:1.3;
-                margin:2.1em 0 .9em 0; color:#0f172a; text-wrap:balance;
+                font-size: clamp(1.25rem, 1.1rem + .6vw, 1.6rem);
+                font-weight: 800;
+                line-height:1.3;
+                margin: 2.15em 0 .95em 0;
+                color:#0f172a;
+                text-wrap: balance;
               }
               .reading h3{
-                font-size:1.24em; font-weight:800; line-height:1.35;
-                margin:1.6em 0 .7em 0;
+                font-size: clamp(1.12rem, 1.02rem + .45vw, 1.35rem);
+                font-weight: 800;
+                line-height:1.35;
+                margin: 1.6em 0 .7em 0;
               }
 
-              /* Ảnh trong bài: không méo, không phình */
+              /* Ảnh trong bài: không méo, không phình, bóng nhẹ */
               .reading img{
                 display:block;
                 width:100%;
-                height:auto;                 /* tránh méo */
-                max-height:520px;            /* tránh phình quá cao */
-                object-fit:cover;
-                object-position:center;
-                margin:1.1rem 0;
-                border-radius:14px;
-                border:1px solid #e2e8f0;
-                box-shadow:0 8px 22px rgba(15,23,42,.06);
+                height:auto;                /* chống méo */
+                max-height: 420px;          /* chống phình quá cao */
+                object-fit: cover;
+                object-position: center;
+                margin: 1.1rem 0;
+                border-radius: 14px;
+                border: 1px solid #e2e8f0;
+                box-shadow: 0 10px 26px rgba(15,23,42,.08);
               }
+
               .reading figure{ margin:1.1rem 0 }
               .reading figcaption{
-                font-size:.85rem; color:#64748b; text-align:center; margin-top:.35rem
+                font-size:.86rem; color:#64748b; text-align:center; margin-top:.4rem
               }
 
-              /* Danh sách & trích dẫn */
-              .reading ul, .reading ol{ padding-left:1.2rem; margin:.6rem 0 .9rem 0 }
+              /* Danh sách & blockquote */
+              .reading ul, .reading ol{ padding-left:1.15rem; margin:.55rem 0 .9rem 0 }
               .reading li{ margin:.25rem 0 }
               .reading blockquote{
-                margin:1.1rem 0; padding:.6rem 1rem;
-                border-left:4px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:.5rem;
+                margin:1.15rem 0; padding:.7rem 1rem;
+                border-left:4px solid #e2e8f0; background:#f8fafc;
+                color:#475569; border-radius:.55rem;
               }
 
-              /* Bảng & code */
-              .reading table{ width:100%; border-collapse:collapse; font-size:.95em; margin:1rem 0 }
+              /* Bảng & code inline */
+              .reading table{ width:100%; border-collapse:collapse; font-size:.96em; margin:1rem 0 }
               .reading th, .reading td{ border:1px solid #e2e8f0; padding:.6rem .7rem; text-align:left }
               .reading code{
-                background:#f8fafc; border:1px solid #e2e8f0; padding:.15rem .35rem; border-radius:.35rem;
-                font-size:.92em;
+                background:#f8fafc; border:1px solid #e2e8f0;
+                padding:.18rem .38rem; border-radius:.38rem; font-size:.92em;
               }
 
               /* Link */
               .reading a{ color:#0ea5e9; text-decoration:none }
               .reading a:hover{ text-decoration:underline }
+
+              /* Ngắt dòng an toàn cho mọi phần tử nội dung nhúng */
+              .reading *{ max-width:100% }
             `}</style>
 
             <div
