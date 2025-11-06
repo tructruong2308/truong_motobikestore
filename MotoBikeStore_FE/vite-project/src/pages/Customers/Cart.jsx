@@ -153,34 +153,35 @@ export default function Cart({ cart = [], setCart }) {
     localStorage.setItem("checkout_selected_ids", JSON.stringify(ids));
   };
 
-  // ======= CSS Shopee-ish
+  // ======= CSS (Skin sáng)
   const css = `
+:root{--line:#e5e7eb;--text:#0f172a;--muted:#64748b}
 .cartX .tbl{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed }
-.cartX th, .cartX td{ padding:14px 12px; border-bottom:1px dashed var(--line, rgba(255,255,255,.08)); vertical-align:middle }
-.cartX thead th{ font-weight:800; color:#e2e8f0; background:rgba(2,6,23,.25) }
+.cartX th, .cartX td{ padding:14px 12px; border-bottom:1px dashed var(--line); vertical-align:middle }
+.cartX thead th{ font-weight:800; color:var(--text); background:#f8fafc; border-bottom:1px solid var(--line) }
 .cartX .prod{ display:flex; align-items:center; gap:12px; min-width:0 }
-.cartX .thumb{ flex:0 0 64px; width:64px; height:64px; border-radius:12px; border:1px solid var(--line, rgba(255,255,255,.08)); object-fit:cover; background:#0f172a }
-.cartX .name{ font-weight:700; color:#e5e7eb; overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
-.cartX .price{ font-weight:700; text-align:right }
+.cartX .thumb{ flex:0 0 64px; width:64px; height:64px; border-radius:12px; border:1px solid var(--line); object-fit:cover; background:#ffffff }
+.cartX .name{ font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
+.cartX .price{ font-weight:700; text-align:right; color:var(--text) }
 .cartX .qty{ display:flex; gap:6px; align-items:center; justify-content:flex-start }
-.cartX .btn{ height:36px; padding:0 12px; border-radius:10px; border:1px solid var(--line, rgba(255,255,255,.12)); background:#0f172a; color:#e2e8f0; font-weight:700; cursor:pointer; transition:transform .08s ease }
+.cartX .btn{ height:36px; padding:0 12px; border-radius:10px; border:1px solid var(--line); background:#ffffff; color:var(--text); font-weight:700; cursor:pointer; transition:transform .08s ease; box-shadow:0 1px 2px rgba(0,0,0,.04) }
 .cartX .btn:active{ transform:scale(.98) }
 .cartX .btn.ghost{ background:transparent }
-.cartX .btn.outline{ background:rgba(2,6,23,.4) }
+.cartX .btn.outline{ background:#ffffff }
 .cartX .qty input{ width:72px; text-align:center }
-.cartX .sumBar{ position:sticky; bottom:12px; display:flex; gap:12px; align-items:center; justify-content:flex-end; padding:14px; border:1px solid var(--line, rgba(255,255,255,.12)); border-radius:14px; background:linear-gradient(180deg, rgba(2,6,23,.6), rgba(2,6,23,.45)); backdrop-filter:blur(6px) }
-.cartX .total{ font-weight:900; font-size:18px }
-.cartX .empty{ text-align:center; padding:28px 16px; color:#9fb3d9 }
-.cartX .empty .box{ display:inline-grid; gap:10px; justify-items:center; padding:18px; border:1px dashed var(--line, rgba(255,255,255,.18)); border-radius:14px; background:rgba(2,6,23,.35) }
-.cartX .tag{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid rgba(148,163,184,.25); background:rgba(2,6,23,.35); font-size:12px; color:#cbd5e1; font-weight:700 }
+.cartX .sumBar{ position:sticky; bottom:12px; display:flex; gap:12px; align-items:center; justify-content:flex-end; padding:14px; border:1px solid var(--line); border-radius:14px; background:#ffffff; box-shadow:0 8px 30px rgba(17,24,39,.06) }
+.cartX .total{ font-weight:900; font-size:18px; color:var(--text) }
+.cartX .empty{ text-align:center; padding:28px 16px; color:var(--muted) }
+.cartX .empty .box{ display:inline-grid; gap:10px; justify-items:center; padding:18px; border:1px dashed var(--line); border-radius:14px; background:#f8fafc }
+.cartX .tag{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:#f1f5f9; font-size:12px; color:var(--text); font-weight:700 }
 .cartX .chk{ width:18px; height:18px; accent-color:#22c55e; cursor:pointer }
   `;
 
   return (
-    <div className="u-grid cartX" style={{ gap: 16 }}>
+    <div className="u-grid cartX" style={{ gap: 16, color: "#0f172a" }}>
       <style>{css}</style>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <h1 style={{ margin: 0 }}>Giỏ hàng</h1>
+        <h1 style={{ margin: 0, color: "#0f172a" }}>Giỏ hàng</h1>
         {cart.length > 0 && <span className="tag">Có {cart.length} sản phẩm</span>}
         {selected.size > 0 && (
           <span className="tag">Đã chọn: {selectedCount} · ₫{VND.format(selectedTotal)}</span>
@@ -188,7 +189,18 @@ export default function Cart({ cart = [], setCart }) {
       </div>
 
       {/* Thanh công cụ */}
-      <div className="u-card u-border" style={{ padding: 12, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div
+        className="u-card u-border"
+        style={{
+          padding: 12,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          flexWrap: "wrap",
+          background: "#ffffff",
+          borderColor: "#e5e7eb",
+        }}
+      >
         <label style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
           <input
             type="checkbox"
@@ -211,7 +223,10 @@ export default function Cart({ cart = [], setCart }) {
         <div className="total">Tổng giỏ: {VND.format(cartTotal)}₫</div>
       </div>
 
-      <div className="u-card u-border" style={{ padding: 0, overflow: "hidden" }}>
+      <div
+        className="u-card u-border"
+        style={{ padding: 0, overflow: "hidden", background: "#ffffff", borderColor: "#e5e7eb" }}
+      >
         <table className="tbl">
           <colgroup>
             <col style={{ width: 52 }} />
@@ -222,80 +237,91 @@ export default function Cart({ cart = [], setCart }) {
             <col style={{ width: 80 }} />
           </colgroup>
 
-        <thead>
-          <tr>
-            <th></th>
-            <th>Sản phẩm</th>
-            <th style={{ textAlign: "right" }}>Giá</th>
-            <th>Số lượng</th>
-            <th style={{ textAlign: "right" }}>Tạm tính</th>
-            <th />
-          </tr>
-        </thead>
-
-        <tbody>
-          {cart.length === 0 && (
+          <thead>
             <tr>
-              <td colSpan={6}>
-                <div className="empty">
-                  <div className="box">
-                    <img src="https://cdn-icons-png.flaticon.com/512/2038/2038854.png" width="60" height="60" style={{ opacity: 0.85 }} />
-                    <div style={{ fontWeight: 800, color: "#e2e8f0" }}>Giỏ hàng trống</div>
-                    <div style={{ fontSize: 13, opacity: 0.8 }}>Tiếp tục mua sắm để thêm sản phẩm nhé!</div>
-                    <a className="u-btn" href="/products">Mua sắm ngay</a>
-                  </div>
-                </div>
-              </td>
+              <th></th>
+              <th>Sản phẩm</th>
+              <th style={{ textAlign: "right" }}>Giá</th>
+              <th>Số lượng</th>
+              <th style={{ textAlign: "right" }}>Tạm tính</th>
+              <th />
             </tr>
-          )}
+          </thead>
 
-          {cart.map((it) => {
-            const id = String(it.id);
-            const price = Number(it.price || 0);
-            const qty = Number(it.qty || 1);
-            const sub = qty * price;
-            const checked = selected.has(id);
-            return (
-              <tr key={id}>
-                <td style={{ textAlign: "center" }}>
-                  <input type="checkbox" className="chk" checked={checked} onChange={() => toggleOne(id)} />
-                </td>
-
-                <td>
-                  <div className="prod">
-                    <img
-                      className="thumb"
-                      src={it.thumbnail_url || "https://placehold.co/64x64?text=No+Img"}
-                      alt={it.name}
-                      onError={(e) => (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")}
-                    />
-                    <div className="name" title={it.name}>{it.name}</div>
+          <tbody>
+            {cart.length === 0 && (
+              <tr>
+                <td colSpan={6}>
+                  <div className="empty">
+                    <div className="box">
+                      <img
+                        src="https://cdn-icons-png.flaticon.com/512/2038/2038854.png"
+                        width="60"
+                        height="60"
+                        style={{ opacity: 0.9 }}
+                      />
+                      <div style={{ fontWeight: 800, color: "#0f172a" }}>Giỏ hàng trống</div>
+                      <div style={{ fontSize: 13, color: "#64748b" }}>
+                        Tiếp tục mua sắm để thêm sản phẩm nhé!
+                      </div>
+                      <a className="u-btn" href="/products" style={{ background: "#111827", color: "#fff" }}>
+                        Mua sắm ngay
+                      </a>
+                    </div>
                   </div>
-                </td>
-
-                <td className="price">{VND.format(price)}₫</td>
-
-                <td>
-                  <div className="qty">
-                    <button className="btn outline" onClick={() => updateQty(it.id, qty - 1)} aria-label="Giảm">−</button>
-                    <input
-                      className="u-input"
-                      value={qty}
-                      onChange={(e) => updateQty(it.id, Math.max(1, parseInt(e.target.value || "1", 10)))}
-                    />
-                    <button className="btn outline" onClick={() => updateQty(it.id, qty + 1)} aria-label="Tăng">+</button>
-                  </div>
-                </td>
-
-                <td style={{ textAlign: "right", fontWeight: 800 }}>{VND.format(sub)}₫</td>
-
-                <td>
-                  <button className="btn ghost" onClick={() => removeItem(it.id)} title="Xoá">✕</button>
                 </td>
               </tr>
-            );
-          })}
-        </tbody>
+            )}
+
+            {cart.map((it) => {
+              const id = String(it.id);
+              const price = Number(it.price || 0);
+              const qty = Number(it.qty || 1);
+              const sub = qty * price;
+              const checked = selected.has(id);
+              return (
+                <tr key={id}>
+                  <td style={{ textAlign: "center" }}>
+                    <input type="checkbox" className="chk" checked={checked} onChange={() => toggleOne(id)} />
+                  </td>
+
+                  <td>
+                    <div className="prod">
+                      <img
+                        className="thumb"
+                        src={it.thumbnail_url || "https://placehold.co/64x64?text=No+Img"}
+                        alt={it.name}
+                        onError={(e) => (e.currentTarget.src = "https://placehold.co/64x64?text=No+Img")}
+                      />
+                      <div className="name" title={it.name}>{it.name}</div>
+                    </div>
+                  </td>
+
+                  <td className="price">{VND.format(price)}₫</td>
+
+                  <td>
+                    <div className="qty">
+                      <button className="btn outline" onClick={() => updateQty(it.id, qty - 1)} aria-label="Giảm">−</button>
+                      <input
+                        className="u-input"
+                        value={qty}
+                        onChange={(e) => updateQty(it.id, Math.max(1, parseInt(e.target.value || "1", 10)))}
+                      />
+                      <button className="btn outline" onClick={() => updateQty(it.id, qty + 1)} aria-label="Tăng">+</button>
+                    </div>
+                  </td>
+
+                  <td style={{ textAlign: "right", fontWeight: 800, color: "#0f172a" }}>
+                    {VND.format(sub)}₫
+                  </td>
+
+                  <td>
+                    <button className="btn ghost" onClick={() => removeItem(it.id)} title="Xoá">✕</button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
         </table>
       </div>
 
@@ -316,7 +342,7 @@ export default function Cart({ cart = [], setCart }) {
         <span className="tag">Đã chọn: {selectedCount}</span>
         <span className="tag">Tổng: ₫{VND.format(selectedTotal)}</span>
 
-        <a className="u-btn" href="/checkout" onClick={goCheckout}>
+        <a className="u-btn" href="/checkout" onClick={goCheckout} style={{ background: "#10b981", color: "#fff" }}>
           Thanh toán
         </a>
       </div>
