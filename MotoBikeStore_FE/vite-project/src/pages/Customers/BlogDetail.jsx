@@ -45,8 +45,8 @@ export default function BlogDetail() {
     );
 
   return (
-    <main className="bg-white">
-      <section className="max-w-6xl mx-auto px-4 py-10 md:py-14">
+    <main className="bg-gradient-to-b from-white to-slate-50/60">
+      <section className="max-w-5xl mx-auto px-4 py-10 md:py-14">
         {/* Breadcrumb */}
         <nav className="text-sm mb-6 md:mb-8 text-slate-500 flex items-center gap-2">
           <Link to="/" className="hover:text-slate-700 transition">Trang chủ</Link>
@@ -56,61 +56,66 @@ export default function BlogDetail() {
           <span className="text-slate-700 line-clamp-1">{post.title}</span>
         </nav>
 
-        {/* Title + Meta (nằm trong vùng đọc hẹp) */}
-        <div className="mx-auto max-w-3xl">
-          <h1 className="text-3xl md:text-[2.15rem] font-extrabold tracking-tight text-slate-900">
+        {/* Title */}
+        <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">
+          <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-sky-500 bg-clip-text text-transparent">
             {post.title}
-          </h1>
-          <p className="mt-3 text-slate-600 text-[15px]">
-            {post.source && <>Nguồn: <b className="text-slate-800">{post.source}</b></>}
-            {post.author && <> • Tác giả: <b className="text-slate-800">{post.author}</b></>}
-            {post.published_at && <> • {new Date(post.published_at).toLocaleString("vi-VN")}</>}
-          </p>
-        </div>
+          </span>
+        </h1>
 
-        {/* Cover (full width trong container, bo góc) */}
-        {post.thumbnail_url && (
-          <div className="mx-auto max-w-4xl mt-6">
+        {/* Meta */}
+        <p className="mt-3 md:mt-4 text-slate-600 text-sm md:text-[15px]">
+          {post.source && <span className="mr-2">Nguồn: <b className="text-slate-800">{post.source}</b></span>}
+          {post.author && <span className="mx-2">• Tác giả: <b className="text-slate-800">{post.author}</b></span>}
+          {post.published_at && (
+            <span className="mx-2">
+              • {new Date(post.published_at).toLocaleString("vi-VN")}
+            </span>
+          )}
+        </p>
+
+        {/* Article card */}
+        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
+          {/* Cover */}
+          {post.thumbnail_url && (
             <img
               src={post.thumbnail_url}
               alt="thumb"
-              className="w-full max-h-[520px] object-cover rounded-2xl border border-slate-200"
+              className="w-full max-h-[460px] object-cover rounded-t-2xl"
               onError={(e) => (e.currentTarget.style.display = "none")}
             />
-          </div>
-        )}
+          )}
 
-        {/* Content – vùng đọc hẹp, chữ lớn, line-height cao */}
-        <article className="mx-auto max-w-3xl mt-8 md:mt-10">
-          {/* Fine-tune prose */}
-          <style>{`
-            .reading :where(p){
-              margin: 0 0 1.05em 0;
-              text-align: justify;
-            }
-            .reading :where(h2){ margin-top:2.2em;margin-bottom:.9em }
-            .reading :where(h3){ margin-top:1.8em;margin-bottom:.7em }
-            .reading :where(img){ border-radius:1rem;border:1px solid #e2e8f0; margin:1rem auto }
-            .reading :where(blockquote){
-              border-left:4px solid #e2e8f0; padding:.2rem 1rem; color:#475569; background:#f8fafc; border-radius:.5rem
-            }
-            .reading :where(code){
-              background:#f8fafc; border:1px solid #e2e8f0; padding:.15rem .35rem; border-radius:.4rem
-            }
-            .reading :where(ul){ list-style:disc; padding-left:1.2rem }
-            .reading :where(ol){ list-style:decimal; padding-left:1.2rem }
-            @media (min-width: 768px){
-              .reading{ font-size:17px; line-height:1.85 }
-            }
-          `}</style>
+          {/* Content */}
+          <article className="p-5 md:p-8">
+            {/* Tinh chỉnh prose cho đẹp & dễ đọc */}
+            <style>{`
+              .prose :where(a):not(:where([class~="not-prose"] *)){
+                color:#0ea5e9; text-decoration:none
+              }
+              .prose :where(a:hover):not(:where([class~="not-prose"] *)){
+                text-decoration:underline
+              }
+              .prose :where(code):not(:where([class~="not-prose"] *)){
+                background:#f8fafc;padding:.15rem .35rem;border-radius:.4rem;border:1px solid #e2e8f0
+              }
+              .prose :where(img):not(:where([class~="not-prose"] *)){
+                border-radius:1rem;border:1px solid #e2e8f0
+              }
+              .prose :where(h2,h3){
+                scroll-margin-top:80px
+              }
+            `}</style>
 
-          <div
-            className="reading text-slate-800 leading-[1.75] text-[16px]"
-            dangerouslySetInnerHTML={{
-              __html: post.content || post.excerpt || "",
-            }}
-          />
-        </article>
+            <div className="prose prose-slate max-w-none prose-headings:font-extrabold prose-h2:text-2xl prose-h3:text-xl prose-p:leading-7">
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: post.content || post.excerpt || "",
+                }}
+              />
+            </div>
+          </article>
+        </div>
       </section>
     </main>
   );
