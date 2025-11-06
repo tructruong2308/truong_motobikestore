@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 /* ====== Config ====== */
 const API_ROOT = (import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api").replace(/\/+$/, "");
@@ -31,9 +31,10 @@ const styles = `
 .form-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px }
 .form-grid .col-span-2{ grid-column:1/-1 }
 .input{ width:100%; height:38px; padding:0 10px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text) }
-.textarea{ width:100%; min-height:180px; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text) }
+.textarea{ width:100%; min-height:220px; padding:10px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--text); resize:vertical }
 label{ font-size:12px; opacity:.9; display:block; margin-bottom:4px }
-.preview{ width:100%; max-height:200px; object-fit:cover; border:1px solid var(--line-soft); border-radius:10px }
+.preview{ width:100%; max-height:220px; object-fit:cover; border:1px solid var(--line-soft); border-radius:10px }
+.tools{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:8px }
 `;
 
 /* ====== Helpers ====== */
@@ -43,9 +44,7 @@ const normalize = (p) => ({
   slug: p.slug ?? "",
   excerpt: p.excerpt ?? "",
   content: p.content ?? "",
-  // hiển thị: hỗ trợ cả thumbnail_url / thumbnail
   thumbnail: p.thumbnail_url ?? p.thumbnail ?? "",
-  // publish/unpublish dùng published_at
   published_at: p.published_at ?? null,
   created_at: p.created_at ?? p.createdAt ?? "",
   source: p.source ?? "",
@@ -71,13 +70,19 @@ export default function Posts(){
   const [editing,setEditing]=useState(null);
   const [saving,setSaving]=useState(false);
 
+  // ref để chèn ảnh vào vị trí con trỏ trong nội dung
+  const contentRef = useRef(null);
+
+  /* ===== Auth ===== */
   const authHeader=()=>{ const t=localStorage.getItem(ADMIN_TOKEN_KEY)||""; return t?{Authorization:`Bearer ${t}`}:{}}; 
   const authFail=(st)=>{ if(st===401||st===403){ localStorage.removeItem(ADMIN_TOKEN_KEY); localStorage.removeItem(ADMIN_USER_KEY); location.href="/admin/login"; return true;} return false; };
 
+  /* ===== API endpoints ===== */
   const listEP = `${ADMIN_API}/posts`;
   const oneEP  = (id) => `${ADMIN_API}/posts/${id}`;
   const uploadEP = `${ADMIN_API}/posts/upload`;
 
+  /* ===== Load list ===== */
   async function load(){
     try{
       setLoading(true); setErr("");
@@ -100,6 +105,7 @@ export default function Posts(){
 
   const list = useMemo(()=> items, [items]);
 
+  /* ===== CRUD ===== */
   function openNew(){
     setEditing({ id:0, title:"", slug:"", excerpt:"", content:"", thumbnail:"", published_at:null, source:"", author:"" });
   }
@@ -114,7 +120,6 @@ export default function Posts(){
         slug: (editing.slug?.trim() || slugify(editing.title || "")),
         excerpt: editing.excerpt?.trim() || "",
         content: editing.content ?? "",
-        // quan trọng: GỬI LÊN BACKEND BẰNG KEY thumbnail_url
         thumbnail_url: editing.thumbnail ?? "",
         published_at: editing.published_at || null,
         source: editing.source ?? "",
@@ -151,7 +156,7 @@ export default function Posts(){
     }catch(e){ alert(e.message || "Lỗi"); }
   }
 
-  async function setPublished(it, publish){ // true->publish, false->unpublish
+  async function setPublished(it, publish){
     try{
       const ep = `${oneEP(it.id)}/${publish ? "publish" : "unpublish"}`;
       const r  = await fetch(ep, { method:"PATCH", headers:{ Accept:"application/json", ...authHeader() }});
@@ -161,35 +166,61 @@ export default function Posts(){
     }catch(e){ alert(e.message || "Lỗi"); }
   }
 
-  /* ===== Upload ảnh thumbnail ===== */
+  /* ===== Upload thumbnail ===== */
   async function handleUploadThumb(e){
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
-
-    if (file.size > 4 * 1024 * 1024) {
-      alert("Ảnh quá 4MB"); e.target.value = ""; return;
-    }
+    if (file.size > 4 * 1024 * 1024) { alert("Ảnh quá 4MB"); return; }
 
     const fd = new FormData();
     fd.append("file", file);
-
     try {
-      const res = await fetch(uploadEP, {
-        method: "POST",
-        headers: { ...authHeader() }, // KHÔNG set Content-Type
-        body: fd,
-      });
+      const res = await fetch(uploadEP, { method:"POST", headers:{ ...authHeader() }, body: fd });
       if (authFail(res.status)) return;
       if (!res.ok) throw new Error("Upload thất bại");
       const j = await res.json();
-      setEditing(v => ({ ...v, thumbnail: j.url })); // hiển thị xem trước + sẽ gửi lên bằng thumbnail_url
-    } catch (err) {
-      alert(err.message || "Upload lỗi");
-    } finally {
-      e.target.value = "";
-    }
+      setEditing(v => ({ ...v, thumbnail: j.url }));
+    } catch (err) { alert(err.message || "Upload lỗi"); }
   }
 
+  /* ===== Chèn ảnh vào nội dung ===== */
+  function insertHtmlIntoContent(html){
+    setEditing(prev=>{
+      if (!contentRef.current) return { ...prev, content: (prev.content || "") + html };
+      const ta = contentRef.current;
+      const start = ta.selectionStart ?? (prev.content?.length || 0);
+      const end   = ta.selectionEnd ?? start;
+      const before = (prev.content || "").slice(0, start);
+      const after  = (prev.content || "").slice(end);
+      const next = before + html + after;
+      requestAnimationFrame(()=>{
+        ta.focus();
+        const pos = start + html.length;
+        ta.setSelectionRange(pos, pos);
+      });
+      return { ...prev, content: next };
+    });
+  }
+
+  async function handleUploadContentImg(e){
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024){ alert("Ảnh quá 4MB"); return; }
+
+    const fd = new FormData();
+    fd.append("file", file);
+    try{
+      const res = await fetch(uploadEP, { method:"POST", headers:{ ...authHeader() }, body: fd });
+      if (authFail(res.status)) return;
+      if (!res.ok) throw new Error("Upload ảnh thất bại");
+      const j = await res.json();
+      insertHtmlIntoContent(`\n<figure><img src="${j.url}" alt="" /></figure>\n`);
+    }catch(err){ alert(err.message || "Upload lỗi"); }
+  }
+
+  /* ===== Render ===== */
   return (
     <section className="admin-screen">
       <style>{styles}</style>
@@ -326,9 +357,9 @@ export default function Posts(){
                 <div className="col-span-2">
                   <label>Ảnh thumbnail (URL)</label>
                   <input className="input" value={editing.thumbnail} onChange={e=> setEditing(v=> ({...v, thumbnail:e.target.value}))}/>
-                  <div style={{ display:"flex", gap:8, alignItems:"center", marginTop:8 }}>
+                  <div className="tools">
                     <input id="thumb-file" type="file" accept="image/*" onChange={handleUploadThumb} style={{ display:"none" }} />
-                    <button className="btn" onClick={()=> document.getElementById('thumb-file').click()}>Chọn ảnh…</button>
+                    <button className="btn" type="button" onClick={()=> document.getElementById('thumb-file').click()}>Chọn ảnh…</button>
                     <small style={{ opacity:.7 }}>JPG/PNG/WEBP/AVIF ≤ 4MB</small>
                   </div>
                   {editing.thumbnail && <img className="preview" src={editing.thumbnail} alt="" onError={(e)=> (e.currentTarget.style.display="none")} />}
@@ -336,7 +367,20 @@ export default function Posts(){
 
                 <div className="col-span-2">
                   <label>Nội dung (HTML/Markdown)</label>
-                  <textarea className="textarea" value={editing.content} onChange={e=> setEditing(v=> ({...v, content:e.target.value}))}/>
+                  <div className="tools">
+                    <input id="content-file" type="file" accept="image/*" onChange={handleUploadContentImg} style={{ display:"none" }}/>
+                    <button className="btn" type="button" onClick={()=> document.getElementById("content-file").click()}>
+                      📷 Chèn ảnh vào nội dung
+                    </button>
+                    <small style={{ opacity:.7 }}>Ảnh sẽ upload & chèn ngay vị trí con trỏ</small>
+                  </div>
+                  <textarea
+                    ref={contentRef}
+                    className="textarea"
+                    value={editing.content}
+                    onChange={e=> setEditing(v=> ({...v, content:e.target.value}))}
+                    placeholder="Bạn có thể dán HTML hoặc Markdown…"
+                  />
                 </div>
               </div>
             </div>

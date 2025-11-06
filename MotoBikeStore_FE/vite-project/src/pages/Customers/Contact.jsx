@@ -30,130 +30,167 @@ export default function Contact() {
     }
   };
 
-  const filled = (v) =>
-    (v?.trim()?.length ? "bg-white" : "bg-white") + " focus:bg-white transition-colors";
+  const filled = (v) => "bg-white"; // luôn trắng, cao cấp
 
   return (
     <main className="relative min-h-[70vh] bg-white">
-      {/* nền nhẹ */}
+      {/* Backdrop premium */}
       <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(900px_420px_at_50%_-10%,rgba(99,102,241,.06),transparent)]"
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={{
+          background:
+            "radial-gradient(900px 420px at 10% -10%, rgba(99,102,241,.08), transparent), radial-gradient(900px 420px at 90% -20%, rgba(56,189,248,.08), transparent)"
+        }}
       />
 
-      {/* scoped styles: tập trung sửa cảm giác input */}
+      {/* SUPER-SCOPED styles cho form xịn */}
       <style>{`
-        .contact-wrap{max-width:1000px}
-        .contact-wrap input,.contact-wrap textarea,.contact-wrap select{
-          background:#fff !important; color:#0f172a !important;
-          border:1px solid #e5e7eb !important; border-radius:16px !important;
-          padding:14px 16px !important; height:48px;
+        .contact-wrap{max-width:1080px}
+        .contact-card{
+          border:1px solid #e6e9ef; border-radius:28px; background:rgba(255,255,255,.9);
+          backdrop-filter:saturate(140%) blur(6px);
+          box-shadow:0 18px 48px -18px rgba(2,6,23,.16), 0 2px 8px rgba(2,6,23,.04);
         }
-        .contact-wrap textarea{height:auto; min-height:140px; line-height:1.6}
-        .contact-wrap input::placeholder,.contact-wrap textarea::placeholder{color:#94a3b8}
-        .contact-wrap label{color:#0f172a; font-weight:700}
-        .contact-wrap .field{display:flex; flex-direction:column; gap:8px}
+        .input-wrap{position:relative}
+        .input-ico{
+          position:absolute; inset-inline-start:14px; inset-block-start:50%; transform:translateY(-50%);
+          font-size:18px; color:#94a3b8
+        }
+        .contact-wrap input,.contact-wrap textarea{
+          width:100%; background:#fff; color:#0f172a; border:1px solid #e5e7eb;
+          border-radius:16px; padding:14px 16px 14px 44px; height:52px;
+          transition:box-shadow .15s ease, border-color .15s ease, transform .05s ease;
+        }
+        .contact-wrap textarea{min-height:160px; height:auto; padding-top:14px}
+        .contact-wrap input::placeholder,.contact-wrap textarea::placeholder{color:#9aa7b5}
+        .contact-wrap label{color:#0f172a; font-weight:800; letter-spacing:.2px}
         .contact-wrap .row{display:grid; gap:16px}
         @media (min-width:768px){ .contact-wrap .row{grid-template-columns:1fr 1fr} }
-        .contact-card{
-          border:1px solid #e5e7eb; border-radius:24px; background:#fff;
-          box-shadow:0 12px 32px -18px rgba(2,6,23,.12);
+        .focusable:focus{
+          outline:none !important; border-color:#7c3aed !important;
+          box-shadow:0 0 0 6px rgba(124,58,237,.14);
         }
-        .contact-wrap .hint{font-size:12px; color:#64748b}
-        .contact-wrap .focus-ring:focus{
-          outline:none !important; box-shadow:0 0 0 4px rgba(99,102,241,.18);
-          border-color:#6366f1 !important;
+        .btn-grad{
+          background:linear-gradient(90deg,#22c55e,#16a34a);
+          color:#fff; height:48px; padding:0 24px; border-radius:14px; font-weight:800;
+          box-shadow:0 10px 24px -10px rgba(16,185,129,.55);
+          transition:transform .06s ease, filter .2s ease, box-shadow .2s ease;
+          border:0;
         }
-        .divider{
-          height:3px; width:96px; margin:16px auto 0; border-radius:999px;
-          background:linear-gradient(90deg,#6366f1,#8b5cf6,#38bdf8);
+        .btn-grad:hover{ filter:brightness(1.03); box-shadow:0 16px 36px -14px rgba(16,185,129,.6) }
+        .btn-grad:active{ transform:translateY(1px) }
+        .badge{
+          display:inline-flex; align-items:center; gap:8px;
+          padding:.4rem .75rem; border-radius:999px; border:1px solid #e6e9ef; background:#f8fafc; color:#475569
         }
+        .divider{height:4px; width:120px; margin:18px auto 0; border-radius:999px;
+          background:linear-gradient(90deg,#4f46e5,#8b5cf6,#06b6d4)}
+        .list-tile{display:flex; gap:12px; padding:12px; border-radius:14px; border:1px solid #eef2f7}
+        .list-tile:hover{background:#f8fafc}
       `}</style>
 
-      <section className="contact-wrap mx-auto px-4 py-10">
+      <section className="contact-wrap mx-auto px-4 py-12">
         {/* Header */}
         <div className="text-center mb-10">
-          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-sm text-slate-600">
-            ✉️ Liên hệ & Hỗ trợ
-          </span>
-          <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-slate-900">
+          <span className="badge">✉️ Liên hệ & Hỗ trợ</span>
+          <h1 className="mt-3 text-3xl md:text-5xl font-black tracking-tight text-slate-900">
             Đăng ký hỗ trợ / liên hệ
           </h1>
-          <p className="mt-2 text-slate-600">
-            Nhập thông tin để chúng tôi phản hồi sớm. Thời gian phản hồi trung bình: <b>1–3 giờ</b>.
+          <p className="mt-3 text-slate-600">
+            Nhập thông tin, chúng tôi sẽ phản hồi sớm. Thời gian phản hồi trung bình: <b>1–3 giờ</b>.
           </p>
           <div className="divider" />
         </div>
 
-        {/* GRID 2 cột: Form | Info (giữ nguyên bố cục) */}
+        {/* GRID 2 cột: Form | Info */}
         <div className="grid md:grid-cols-2 gap-8">
-          {/* FORM CARD */}
+          {/* FORM */}
           <form onSubmit={onSubmit} className="contact-card p-6 md:p-8">
-            <div className="field mb-5">
-              <label>Họ tên <span className="text-rose-600">*</span></label>
-              <input
-                className={`focus-ring ${filled(form.name)}`}
-                placeholder="Nguyễn Văn A"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                required
-              />
-            </div>
-
-            <div className="row mb-5">
-              <div className="field">
-                <label>E-mail <span className="text-rose-600">*</span></label>
+            {/* Họ tên */}
+            <div className="mb-5">
+              <label className="block text-sm mb-2">Họ tên <span className="text-rose-600">*</span></label>
+              <div className="input-wrap">
+                <span className="input-ico">👤</span>
                 <input
-                  type="email"
-                  className={`focus-ring ${filled(form.email)}`}
-                  placeholder="ban@email.com"
-                  value={form.email}
-                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className={`focusable ${filled(form.name)}`}
+                  placeholder="Nguyễn Văn A"
+                  value={form.name}
+                  onChange={(e) => setForm({ ...form, name: e.target.value })}
                   required
                 />
               </div>
-              <div className="field">
-                <label>Số điện thoại</label>
+            </div>
+
+            {/* Email | Phone */}
+            <div className="row mb-5">
+              <div>
+                <label className="block text-sm mb-2">E-mail <span className="text-rose-600">*</span></label>
+                <div className="input-wrap">
+                  <span className="input-ico">📧</span>
+                  <input
+                    type="email"
+                    className="focusable bg-white"
+                    placeholder="ban@email.com"
+                    value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm mb-2">Số điện thoại</label>
+                <div className="input-wrap">
+                  <span className="input-ico">📞</span>
+                  <input
+                    className="focusable bg-white"
+                    placeholder="09xxxxxxxx"
+                    value={form.phone}
+                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Tiêu đề */}
+            <div className="mb-5">
+              <label className="block text-sm mb-2">
+                Tiêu đề <span className="text-slate-400 text-xs font-normal">(tuỳ chọn)</span>
+              </label>
+              <div className="input-wrap">
+                <span className="input-ico">📝</span>
                 <input
-                  className={`focus-ring ${filled(form.phone)}`}
-                  placeholder="09xxxxxxxx"
-                  value={form.phone}
-                  onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                  className="focusable bg-white"
+                  placeholder="Tóm tắt vấn đề của bạn"
+                  value={form.subject}
+                  onChange={(e) => setForm({ ...form, subject: e.target.value })}
                 />
               </div>
             </div>
 
-            <div className="field mb-5">
-              <label>Tiêu đề <span className="text-slate-400 text-xs font-normal">(tuỳ chọn)</span></label>
-              <input
-                className={`focus-ring ${filled(form.subject)}`}
-                placeholder="Tóm tắt vấn đề của bạn"
-                value={form.subject}
-                onChange={(e) => setForm({ ...form, subject: e.target.value })}
-              />
-            </div>
-
-            <div className="field mb-2">
-              <label>Nội dung <span className="text-rose-600">*</span></label>
-              <textarea
-                className={`focus-ring ${filled(form.message)}`}
-                placeholder="Mô tả chi tiết vấn đề hoặc hỗ trợ bạn cần…"
-                value={form.message}
-                onChange={(e) => setForm({ ...form, message: e.target.value })}
-                required
-              />
-              <div className="flex items-center justify-between hint mt-1">
+            {/* Nội dung */}
+            <div className="mb-2">
+              <label className="block text-sm mb-2">Nội dung <span className="text-rose-600">*</span></label>
+              <div className="input-wrap">
+                <span className="input-ico" style={{ insetBlockStart: 18 }}>💬</span>
+                <textarea
+                  className="focusable bg-white"
+                  placeholder="Mô tả chi tiết vấn đề hoặc hỗ trợ bạn cần…"
+                  value={form.message}
+                  onChange={(e) => setForm({ ...form, message: e.target.value })}
+                  required
+                  style={{ paddingLeft: 44 }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-slate-500 mt-2">
                 <span>Gợi ý: nêu rõ mẫu xe / thời gian / nội dung cần hỗ trợ.</span>
                 <span>{(form.message || "").length}/1000</span>
               </div>
             </div>
 
+            {/* Submit */}
             <div className="pt-5 flex items-center gap-3">
-              <button
-                disabled={loading}
-                className={`h-11 px-6 rounded-2xl text-white font-semibold transition
-                ${loading ? "bg-slate-400 cursor-not-allowed" : "bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800"}`}
-              >
+              <button disabled={loading} className="btn-grad" aria-busy={loading}>
                 {loading ? "Đang gửi..." : "Gửi yêu cầu"}
               </button>
               {msg && (
@@ -164,37 +201,37 @@ export default function Contact() {
             </div>
           </form>
 
-          {/* INFO CARD (giữ nguyên nội dung) */}
+          {/* INFO */}
           <aside className="contact-card p-6 md:p-8">
-            <h2 className="text-xl font-bold text-slate-900 mb-5">Thông tin cửa hàng</h2>
-            <ul className="space-y-4 text-slate-700">
-              <li className="flex items-start gap-3">
-                <span className="mt-1">📧</span>
+            <h2 className="text-xl font-black text-slate-900 mb-5">Thông tin cửa hàng</h2>
+            <ul className="space-y-3 text-slate-700">
+              <li className="list-tile">
+                <span className="mt-0.5">📧</span>
                 <div>
-                  <div className="font-medium">E-mail</div>
+                  <div className="font-semibold">E-mail</div>
                   <a href="mailto:support@motobikestore.vn" className="text-indigo-700 hover:underline">
                     support@motobikestore.vn
                   </a>
                 </div>
               </li>
-              <li className="flex items-start gap-3">
-                <span className="mt-1">☎️</span>
+              <li className="list-tile">
+                <span className="mt-0.5">☎️</span>
                 <div>
-                  <div className="font-medium">Đường dây nóng</div>
+                  <div className="font-semibold">Đường dây nóng</div>
                   <div>0900 000 000</div>
                 </div>
               </li>
-              <li className="flex items-start gap-3">
-                <span className="mt-1">📍</span>
+              <li className="list-tile">
+                <span className="mt-0.5">📍</span>
                 <div>
-                  <div className="font-medium">Địa chỉ</div>
+                  <div className="font-semibold">Địa chỉ</div>
                   <div>123 Lê Lợi, Q.1, TP.HCM</div>
                 </div>
               </li>
-              <li className="flex items-start gap-3">
-                <span className="mt-1">🕘</span>
+              <li className="list-tile">
+                <span className="mt-0.5">🕘</span>
                 <div>
-                  <div className="font-medium">Giờ làm việc</div>
+                  <div className="font-semibold">Giờ làm việc</div>
                   <div>8:00–21:00 (T2–CN)</div>
                   <div className="text-slate-600 mt-1">🔧 Bảo hành chính hãng • 🚚 Giao hàng toàn quốc</div>
                 </div>

@@ -78,42 +78,70 @@ export default function BlogDetail() {
         <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
           {/* Cover */}
           {post.thumbnail_url && (
-            <img
-              src={post.thumbnail_url}
-              alt="thumb"
-              className="w-full max-h-[460px] object-cover rounded-t-2xl"
-              onError={(e) => (e.currentTarget.style.display = "none")}
-            />
+            <figure className="rounded-t-2xl overflow-hidden">
+              <img
+                src={post.thumbnail_url}
+                alt="thumb"
+                className="w-full max-h-[460px] object-cover"
+                onError={(e) => (e.currentTarget.style.display = "none")}
+              />
+            </figure>
           )}
 
           {/* Content */}
           <article className="p-5 md:p-8">
-            {/* Tinh chỉnh prose cho đẹp & dễ đọc */}
+            {/* TYPOGRAPHY UPGRADE */}
             <style>{`
-              .prose :where(a):not(:where([class~="not-prose"] *)){
-                color:#0ea5e9; text-decoration:none
+              /* Vùng bài viết */
+              .news-body{
+                color:#0f172a;
+                font-size:17.5px;                /* cỡ chữ đọc báo */
+                line-height:1.85;                 /* giãn dòng thoáng */
+                letter-spacing:.1px;
+                text-align:justify;               /* căn đều hai bên */
+                -webkit-hyphens:auto; hyphens:auto;
               }
-              .prose :where(a:hover):not(:where([class~="not-prose"] *)){
-                text-decoration:underline
+              .news-body p{ margin: 0 0 1.05em; }
+              .news-body p + p{ text-indent: 1.25em; } /* thụt đầu dòng các đoạn sau */
+              .news-body h2, .news-body h3{
+                font-weight:800; color:#0f172a; line-height:1.35;
+                margin:1.6em 0 .6em;
               }
-              .prose :where(code):not(:where([class~="not-prose"] *)){
-                background:#f8fafc;padding:.15rem .35rem;border-radius:.4rem;border:1px solid #e2e8f0
+              .news-body h2{ font-size:1.35em; }
+              .news-body h3{ font-size:1.2em; }
+              .news-body strong{ font-weight:800; color:#0f172a; }
+              .news-body a{ color:#0ea5e9; text-decoration:none }
+              .news-body a:hover{ text-decoration:underline }
+              .news-body ul, .news-body ol{ padding-left:1.25em; margin: .8em 0 1.1em; }
+              .news-body li{ margin:.35em 0; }
+              .news-body blockquote{
+                margin:1.2em 0; padding: .9em 1.1em; background:#f8fafc;
+                border-left:4px solid #94a3b8; border-radius:.5rem; color:#334155;
               }
-              .prose :where(img):not(:where([class~="not-prose"] *)){
-                border-radius:1rem;border:1px solid #e2e8f0
+              .news-body img{
+                max-width:100%; border-radius:1rem; border:1px solid #e2e8f0;
+                display:block; margin:1.1em auto;
               }
-              .prose :where(h2,h3){
-                scroll-margin-top:80px
+              .news-body figure{ margin:1.2em 0; }
+              .news-body figcaption{
+                text-align:center; font-size:.9rem; color:#64748b; margin-top:.4rem;
               }
+              /* Bảng */
+              .news-body table{
+                width:100%; border-collapse:separate; border-spacing:0;
+                margin:1.1em 0; font-size:.98em;
+              }
+              .news-body th, .news-body td{
+                padding:.7em .8em; border:1px solid #e2e8f0;
+              }
+              .news-body th{ background:#f8fafc; font-weight:700; }
             `}</style>
 
-            <div className="prose prose-slate max-w-none prose-headings:font-extrabold prose-h2:text-2xl prose-h3:text-xl prose-p:leading-7">
-              <div
-                dangerouslySetInnerHTML={{
-                  __html: post.content || post.excerpt || "",
-                }}
-              />
-            </div>
+            <div
+              className="news-body"
+              // BE có thể trả content là HTML; fallback sang excerpt
+              dangerouslySetInnerHTML={{ __html: post.content || post.excerpt || "" }}
+            />
           </article>
         </div>
       </section>
