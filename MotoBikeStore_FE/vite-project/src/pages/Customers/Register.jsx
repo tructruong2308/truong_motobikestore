@@ -66,18 +66,17 @@ export default function Register() {
     }
   };
 
-  // ========== UI HELPERS ==========
+  // ========== UI HELPERS (Light theme) ==========
   const card = {
     width: "100%",
     maxWidth: 520,
     padding: 20,
     borderRadius: 16,
-    border: "1px solid rgba(148,163,184,.25)",
-    background:
-      "linear-gradient(180deg, rgba(15,23,42,.55), rgba(2,6,23,.65))",
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
     boxShadow:
-      "0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)",
-    color: "#e5e7eb",
+      "0 1px 2px rgba(0,0,0,.04), 0 8px 30px rgba(17,24,39,.06)",
+    color: "#0f172a",
   };
 
   const label = {
@@ -85,8 +84,9 @@ export default function Register() {
     marginBottom: 6,
     fontSize: 13,
     fontWeight: 600,
-    letterSpacing: .2,
-    opacity: .92,
+    letterSpacing: 0.2,
+    opacity: 0.95,
+    color: "#334155",
   };
 
   const input = {
@@ -94,11 +94,12 @@ export default function Register() {
     height: 44,
     padding: "10px 14px",
     borderRadius: 12,
-    border: "1px solid rgba(148,163,184,.28)",
-    background: "rgba(2,6,23,.6)",
-    color: "#e5e7eb",
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    color: "#0f172a",
     outline: "none",
     transition: "border-color .15s, box-shadow .15s",
+    boxShadow: "inset 0 1px 2px rgba(0,0,0,.03)",
   };
 
   const inputFocus = {
@@ -109,23 +110,24 @@ export default function Register() {
   const chip = {
     padding: "6px 10px",
     borderRadius: 999,
-    border: "1px solid rgba(148,163,184,.25)",
-    background: "rgba(15,23,42,.35)",
+    border: "1px solid #e5e7eb",
+    background: "#f8fafc",
     fontSize: 12,
+    color: "#0f172a",
   };
 
   const btn = (disabled) => ({
     height: 44,
     borderRadius: 12,
-    border: "1px solid rgba(16,185,129,.55)",
-    background:
-      "linear-gradient(180deg, rgba(16,185,129,.35), rgba(5,150,105,.4))",
-    color: "#ecfdf5",
+    border: "1px solid #10b981",
+    background: "linear-gradient(180deg, #34d399, #10b981)",
+    color: "white",
     fontWeight: 800,
-    letterSpacing: .3,
+    letterSpacing: 0.3,
     cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? .65 : 1,
-    transition: "transform .06s ease",
+    opacity: disabled ? 0.7 : 1,
+    transition: "transform .06s ease, box-shadow .15s ease",
+    boxShadow: "0 6px 18px rgba(16,185,129,.25)",
   });
 
   return (
@@ -136,7 +138,8 @@ export default function Register() {
         placeItems: "center",
         padding: 20,
         background:
-          "radial-gradient(1100px 650px at 8% -12%, #1f2937 0%, transparent 55%), radial-gradient(1100px 650px at 108% 12%, #0ea5e9 0%, transparent 50%), #0b1320",
+          "linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #f1f5f9 100%)",
+        color: "#0f172a",
       }}
     >
       <div className="u-card u-border" style={card}>
@@ -145,7 +148,11 @@ export default function Register() {
           <div className="u-chip" style={chip}>MotoBikeStore</div>
           <div className="u-chip" style={chip}>Tạo tài khoản</div>
           <div style={{ flex: 1 }} />
-          <div className="u-chip" title="MotoBikeStore" style={{ ...chip, fontWeight: 800 }}>
+          <div
+            className="u-chip"
+            title="MotoBikeStore"
+            style={{ ...chip, fontWeight: 800 }}
+          >
             🏍️
           </div>
         </div>
@@ -156,13 +163,12 @@ export default function Register() {
             fontSize: 26,
             fontWeight: 900,
             lineHeight: 1.2,
-            color: "#f8fafc",
-            textShadow: "0 1px 0 rgba(0,0,0,.35)",
+            color: "#0f172a",
           }}
         >
           Đăng ký tài khoản
         </h1>
-        <p style={{ margin: 0, opacity: .8, fontSize: 13.5 }}>
+        <p style={{ margin: 0, opacity: 0.85, fontSize: 13.5, color: "#334155" }}>
           Nhập thông tin để tạo tài khoản mới.
         </p>
 
@@ -174,14 +180,12 @@ export default function Register() {
               padding: 12,
               borderRadius: 12,
               border: `1px solid ${
-                message.startsWith("✅")
-                  ? "rgba(16,185,129,.5)"
-                  : "rgba(239,68,68,.5)"
+                message.startsWith("✅") ? "#86efac" : "#fecaca"
               }`,
               background: message.startsWith("✅")
-                ? "linear-gradient(180deg, rgba(6,78,59,.25), rgba(2,44,34,.25))"
-                : "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
-              color: message.startsWith("✅") ? "#A7F3D0" : "#FECACA",
+                ? "linear-gradient(180deg, #ecfdf5, #dcfce7)"
+                : "linear-gradient(180deg, #fff1f2, #ffe4e6)",
+              color: message.startsWith("✅") ? "#166534" : "#991b1b",
               fontSize: 13.5,
             }}
           >
@@ -201,7 +205,7 @@ export default function Register() {
               onChange={onChange}
               required
               style={input}
-              onFocus={(e) => Object.assign(e.target.style, inputFocus)}
+              onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus })}
               onBlur={(e) => Object.assign(e.target.style, input)}
             />
           </div>
@@ -217,7 +221,7 @@ export default function Register() {
               onChange={onChange}
               required
               style={input}
-              onFocus={(e) => Object.assign(e.target.style, inputFocus)}
+              onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus })}
               onBlur={(e) => Object.assign(e.target.style, input)}
             />
           </div>
@@ -234,7 +238,7 @@ export default function Register() {
               onChange={onChange}
               required
               style={input}
-              onFocus={(e) => Object.assign(e.target.style, inputFocus)}
+              onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus })}
               onBlur={(e) => Object.assign(e.target.style, input)}
             />
           </div>
@@ -244,8 +248,8 @@ export default function Register() {
             <label style={label}>Ảnh đại diện</label>
             <div
               style={{
-                border: "1px dashed rgba(148,163,184,.35)",
-                background: "rgba(2,6,23,.4)",
+                border: "1px dashed #e5e7eb",
+                background: "#f8fafc",
                 borderRadius: 12,
                 padding: 12,
                 display: "flex",
@@ -258,12 +262,13 @@ export default function Register() {
                 style={{
                   padding: "10px 12px",
                   borderRadius: 10,
-                  border: "1px solid rgba(148,163,184,.45)",
-                  background: "rgba(15,23,42,.35)",
+                  border: "1px solid #e5e7eb",
+                  background: "#ffffff",
                   cursor: "pointer",
                   fontWeight: 700,
                   fontSize: 13,
                   whiteSpace: "nowrap",
+                  color: "#0f172a",
                 }}
               >
                 Chọn ảnh…
@@ -275,7 +280,7 @@ export default function Register() {
                 />
               </label>
 
-              <div style={{ fontSize: 12.5, opacity: .85 }}>
+              <div style={{ fontSize: 12.5, opacity: 0.85, color: "#334155" }}>
                 PNG/JPG/WEBP ≤ 2MB. Nên chọn ảnh vuông.
               </div>
 
@@ -289,8 +294,8 @@ export default function Register() {
                     height: 72,
                     objectFit: "cover",
                     borderRadius: "50%",
-                    border: "2px solid rgba(255,255,255,.25)",
-                    boxShadow: "0 6px 16px rgba(0,0,0,.35)",
+                    border: "2px solid #e5e7eb",
+                    boxShadow: "0 6px 16px rgba(0,0,0,.12)",
                   }}
                 />
               )}
@@ -310,8 +315,16 @@ export default function Register() {
                 onChange={onChange}
                 required
                 style={{ ...input, paddingRight: 88 }}
-                onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus, paddingRight: 88 })}
-                onBlur={(e) => Object.assign(e.target.style, { ...input, paddingRight: 88 })}
+                onFocus={(e) =>
+                  Object.assign(e.target.style, {
+                    ...input,
+                    ...inputFocus,
+                    paddingRight: 88,
+                  })
+                }
+                onBlur={(e) =>
+                  Object.assign(e.target.style, { ...input, paddingRight: 88 })
+                }
               />
               <button
                 type="button"
@@ -324,9 +337,10 @@ export default function Register() {
                   height: 32,
                   padding: "0 12px",
                   borderRadius: 10,
-                  border: "1px solid rgba(148,163,184,.45)",
-                  background: "rgba(15,23,42,.35)",
+                  border: "1px solid #e5e7eb",
+                  background: "#f8fafc",
                   fontWeight: 700,
+                  color: "#0f172a",
                 }}
               >
                 {showPassword ? "Ẩn" : "Hiện"}
@@ -347,8 +361,16 @@ export default function Register() {
                 onChange={onChange}
                 required
                 style={{ ...input, paddingRight: 88 }}
-                onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus, paddingRight: 88 })}
-                onBlur={(e) => Object.assign(e.target.style, { ...input, paddingRight: 88 })}
+                onFocus={(e) =>
+                  Object.assign(e.target.style, {
+                    ...input,
+                    ...inputFocus,
+                    paddingRight: 88,
+                  })
+                }
+                onBlur={(e) =>
+                  Object.assign(e.target.style, { ...input, paddingRight: 88 })
+                }
               />
               <button
                 type="button"
@@ -361,9 +383,10 @@ export default function Register() {
                   height: 32,
                   padding: "0 12px",
                   borderRadius: 10,
-                  border: "1px solid rgba(148,163,184,.45)",
-                  background: "rgba(15,23,42,.35)",
+                  border: "1px solid #e5e7eb",
+                  background: "#f8fafc",
                   fontWeight: 700,
+                  color: "#0f172a",
                 }}
               >
                 {showConfirm ? "Ẩn" : "Hiện"}
@@ -382,7 +405,7 @@ export default function Register() {
               onChange={onChange}
               required
               style={input}
-              onFocus={(e) => Object.assign(e.target.style, inputFocus)}
+              onFocus={(e) => Object.assign(e.target.style, { ...input, ...inputFocus })}
               onBlur={(e) => Object.assign(e.target.style, input)}
             />
           </div>
@@ -406,12 +429,23 @@ export default function Register() {
               justifyContent: "space-between",
               alignItems: "center",
               fontSize: 13,
-              opacity: .85,
+              opacity: 0.9,
               marginTop: 2,
+              color: "#334155",
             }}
           >
             <span>Đã có tài khoản?</span>
-            <Link to="/login" className="u-chip" style={{ ...chip, textDecoration: "none" }}>
+            <Link
+              to="/login"
+              className="u-chip"
+              style={{
+                ...chip,
+                textDecoration: "none",
+                background: "#eef2ff",
+                borderColor: "#e0e7ff",
+                color: "#3730a3",
+              }}
+            >
               Đăng nhập →
             </Link>
           </div>
