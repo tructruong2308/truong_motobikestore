@@ -39,19 +39,22 @@ export default function AdminSidebar() {
           <FiHome /> Dashboard
         </NavLink>
         <NavLink to="/admin/products" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <FiBox /> Products
+          <FiBox /> Sản Phẩm
         </NavLink>
         <NavLink to="/admin/categories" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <FiTag /> Categories
+          <FiTag /> Danh Mục
         </NavLink>
         <NavLink to="/admin/orders" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <FiShoppingCart /> Orders
+          <FiShoppingCart /> Đơn Hàng
         </NavLink>
         <NavLink to="/admin/users" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <FiUsers /> Users
+          <FiUsers /> Tài Khoản
         </NavLink>
         <NavLink to="/admin/coupons" style={linkStyle} className={({isActive})=>isActive?"active":""}>
-          <LuTicketPercent /> Coupon
+          <LuTicketPercent /> Mã Giảm Giá
+        </NavLink>
+        <NavLink to="/admin/contacts" style={linkStyle} className={({isActive})=>isActive?"active":""}>
+          <LuTicketPercent /> Liên Hệ
         </NavLink>
       </nav>
     </div>
