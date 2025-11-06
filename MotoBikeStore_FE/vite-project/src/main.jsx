@@ -29,6 +29,11 @@ import Login from "./pages/Customers/Login";
 import Checkout from "./pages/Customers/Checkout";
 import Profile from "./pages/Customers/Profile";
 import Orders from "./pages/Customers/Orders";
+import About from "./pages/Static/About";
+import Contact from "./pages/Static/Contact";
+import Blog from "./pages/Static/Blog";
+import BlogDetail from "./pages/Static/BlogDetail";
+
 
 /* Admin pages */
 import AdminLogin from "./pages/Admin/AdminLogin";
@@ -277,6 +282,10 @@ function Layout({ children }) {
             <LinkItem to="/" label="Trang chủ" exact />
             <LinkItem to="/products" label="Sản phẩm" />
             <LinkItem to="/cart" label="Giỏ hàng" />
+            <LinkItem to="/gioi-thieu" label="Giới thiệu" />
+            <LinkItem to="/lien-he" label="Liên hệ" />
+            <LinkItem to="/blog" label="Tin tức" />
+
           </nav>
 
           {/* Ô tìm kiếm có gợi ý */}
@@ -557,7 +566,12 @@ function App() {
           <Route path="/login" element={<Layout><Login /></Layout>} />
           <Route path="/profile" element={<Layout><CustomerProtected><Profile /></CustomerProtected></Layout>} />
           <Route path="/orders" element={<Layout><CustomerProtected><Orders /></CustomerProtected></Layout>} />
+          <Route path="/gioi-thieu" element={<Layout><About /></Layout>} />
+          <Route path="/lien-he" element={<Layout><Contact /></Layout>} />
+          <Route path="/blog" element={<Layout><Blog /></Layout>} />
+          <Route path="/blog/:slug" element={<Layout><BlogDetail /></Layout>} />
 
+     
           {/* Admin */}
           <Route path="/admin/login" element={<AdminLogin />} />
           <Route path="/admin" element={<AdminProtected><AdminLayout /></AdminProtected>}>

@@ -4,7 +4,7 @@ return [
     // Chỉ áp dụng CORS cho các endpoint cần thiết
     'paths' => [
         'api/*',
-        'broadcasting/*',
+        'broadcasting/auth',
         'sanctum/csrf-cookie', // nếu không dùng Sanctum có thể bỏ dòng này
     ],
 

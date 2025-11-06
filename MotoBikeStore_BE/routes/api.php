@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\ReviewController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ProfileController;
 use App\Http\Controllers\Api\CouponController;
+use App\Http\Controllers\PostController;
+use App\Http\Controllers\ContactController;
+
 
 /* ---------- PUBLIC ---------- */
 Route::post('/register',        [AuthController::class, 'register']);
@@ -23,6 +26,15 @@ Route::get('/categories/{id}',          [CategoryController::class, 'show']);
 Route::get('/categories/{id}/products', [ProductController::class, 'byCategory']);
 
 Route::get('/products/{id}/reviews', [ReviewController::class, 'index']);
+
+/* 📰 BLOG / TIN TỨC */
+Route::get('/posts', [PostController::class, 'index']);
+Route::get('/posts/{slug}', [PostController::class, 'show']);
+Route::post('/posts', [PostController::class, 'store']); // dùng cho n8n import RSS
+
+/* 💬 LIÊN HỆ / HỖ TRỢ */
+Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/contact',  [ContactController::class, 'index']); // optional: admin xem danh sách
 
 /* MoMo public callbacks */
 Route::get ('/payments/momo/return', [PaymentController::class, 'momoReturn']);
