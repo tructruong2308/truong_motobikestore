@@ -20,32 +20,6 @@ export default function BlogDetail() {
     })();
   }, [slug]);
 
-  // --- ❶ Chuẩn hoá nội dung: tự bọc <p> nếu không có markup ---
-  const normalizeHtml = (raw) => {
-    const html = (raw || "").trim();
-    if (!html) return "";
-    // Nếu đã có p/br/heading/list/table/img... coi như đã là HTML
-    if (/<(p|br|h[1-6]|ul|ol|table|img|figure)\b/i.test(html)) return html;
-
-    // Có xuống dòng: tách theo block trống
-    if (/\n/.test(html)) {
-      const blocks = html
-        .replace(/\r/g, "")
-        .split(/\n{2,}/)             // 1 block = 1–n dòng, cách nhau ≥1 dòng trống
-        .map(s => s.trim())
-        .filter(Boolean);
-      return blocks.map(b => `<p>${b.replace(/\n+/g, " ")}</p>`).join("");
-    }
-
-    // Không có xuống dòng → tách theo câu, gom 2–3 câu/đoạn
-    const sentences = html.split(/(?<=[\.!?…])\s+(?=[A-ZÀ-Ỹ“0-9])/u);
-    const paras = [];
-    for (let i = 0; i < sentences.length; i += 3) {
-      paras.push(`<p>${sentences.slice(i, i + 3).join(" ")}</p>`);
-    }
-    return paras.join("");
-  };
-
   if (loading)
     return (
       <main className="bg-white">
@@ -70,11 +44,9 @@ export default function BlogDetail() {
       </main>
     );
 
-  const contentHTML = normalizeHtml(post.content || post.excerpt || "");
-
   return (
     <main className="bg-gradient-to-b from-white to-slate-50/60">
-      <section className="max-w-5xl mx-auto px-4 py-10 md:py-14">
+      <section className="max-w-6xl mx-auto px-4 py-10 md:py-14">
         {/* Breadcrumb */}
         <nav className="text-sm mb-6 md:mb-8 text-slate-500 flex items-center gap-2">
           <Link to="/" className="hover:text-slate-700 transition">Trang chủ</Link>
@@ -96,74 +68,99 @@ export default function BlogDetail() {
           {post.source && <span className="mr-2">Nguồn: <b className="text-slate-800">{post.source}</b></span>}
           {post.author && <span className="mx-2">• Tác giả: <b className="text-slate-800">{post.author}</b></span>}
           {post.published_at && (
-            <span className="mx-2">• {new Date(post.published_at).toLocaleString("vi-VN")}</span>
+            <span className="mx-2">
+              • {new Date(post.published_at).toLocaleString("vi-VN")}
+            </span>
           )}
         </p>
 
-        {/* Article */}
-        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {/* Card */}
+        <div className="mt-6 md:mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+          {/* Cover */}
           {post.thumbnail_url && (
-            <figure className="rounded-t-2xl overflow-hidden">
-              <img
-                src={post.thumbnail_url}
-                alt="thumb"
-                className="w-full max-h-[460px] object-cover"
-                onError={(e) => (e.currentTarget.style.display = "none")}
-              />
-            </figure>
+            <img
+              src={post.thumbnail_url}
+              alt="thumb"
+              className="w-full max-h-[460px] object-cover"
+              onError={(e) => (e.currentTarget.style.display = "none")}
+            />
           )}
 
+          {/* Content */}
           <article className="p-5 md:p-8">
-            {/* ❷ Typography nâng cấp: chiều rộng 74ch, căn đều, khoảng cách đoạn, drop-cap nhẹ */}
+            {/* Typography tuning – giống báo/đọc dài, dễ nhìn */}
             <style>{`
-              .news-body{
-                color:#0f172a;
-                font-size:17.5px;
-                line-height:1.85;
-                letter-spacing:.1px;
-                text-align:justify;
-                max-width:74ch;           /* độ rộng dòng lý tưởng */
-                margin:0 auto;            /* căn giữa cột chữ */
-                word-wrap:break-word;
-                text-rendering:optimizeLegibility;
+              .reading { 
+                max-width: 68ch;               /* chiều rộng dòng ~70 ký tự */
+                margin-inline: auto;
+                color: #0f172a;
+                letter-spacing: .1px;
               }
-              .news-body p{ margin: 0 0 1.05em; }
-              .news-body p + p{ text-indent: 1.25em; }  /* thụt đầu dòng đoạn sau */
-              .news-body h2,.news-body h3{
-                font-weight:800; color:#0f172a; line-height:1.35;
-                margin:1.6em 0 .6em;
-                text-indent:0;
+              @media (min-width: 768px){
+                .reading{ font-size: 18px; line-height: 1.9; }
               }
-              .news-body h2{ font-size:1.35em; }
-              .news-body h3{ font-size:1.2em; }
-              .news-body strong{ font-weight:800; color:#0f172a; }
-              .news-body a{ color:#0ea5e9; text-decoration:none }
-              .news-body a:hover{ text-decoration:underline }
-              .news-body ul,.news-body ol{ padding-left:1.25em; margin:.8em 0 1.1em; }
-              .news-body li{ margin:.35em 0; }
-              .news-body blockquote{
-                margin:1.2em 0; padding:.9em 1.1em; background:#f8fafc;
-                border-left:4px solid #94a3b8; border-radius:.5rem; color:#334155;
+              @media (max-width: 767.9px){
+                .reading{ font-size: 16px; line-height: 1.8; }
               }
-              .news-body img{
-                max-width:100%; border-radius:1rem; border:1px solid #e2e8f0;
-                display:block; margin:1.1em auto;
+              .reading p{
+                margin: 0 0 1.1em 0;
+                text-align: justify;          /* canh đều giống ảnh bạn gửi */
+                text-justify: inter-word;
+                hyphens: auto;
               }
-              .news-body table{
-                width:100%; border-collapse:separate; border-spacing:0;
-                margin:1.1em 0; font-size:.98em;
+              .reading h2{
+                font-size: 1.45em;
+                font-weight: 800;
+                color: #0f172a;
+                margin: 2.2em 0 .9em 0;
+                line-height: 1.3;
+                text-wrap: balance;
               }
-              .news-body th,.news-body td{ padding:.7em .8em; border:1px solid #e2e8f0; }
-              .news-body th{ background:#f8fafc; font-weight:700; }
-              .news-body p:first-of-type::first-letter{
-                float:left; font-size:2.6em; line-height:1; padding:.05em .12em 0 .02em;
-                font-weight:800; color:#0f172a;
+              .reading h3{
+                font-size: 1.25em;
+                font-weight: 800;
+                margin: 1.8em 0 .7em 0;
+                line-height: 1.35;
               }
+              .reading img{
+                display:block;
+                max-width:100%;
+                height:auto;
+                margin: 1rem auto;
+                border-radius: 14px;
+                border: 1px solid #e2e8f0;
+              }
+              .reading figure{ margin: 1rem 0; }
+              .reading figcaption{
+                font-size: .85rem; color:#64748b; text-align:center; margin-top:.35rem;
+              }
+              .reading ul, .reading ol{ padding-left: 1.2rem; margin: .75rem 0 1rem 0; }
+              .reading li{ margin: .25rem 0; }
+              .reading blockquote{
+                margin: 1.25rem 0; padding: .5rem 1rem;
+                border-left: 4px solid #e2e8f0; background:#f8fafc; color:#475569; border-radius:.5rem;
+              }
+              .reading code{
+                background:#f8fafc; border:1px solid #e2e8f0; padding:.15rem .35rem; border-radius:.35rem;
+                font-size: .92em;
+              }
+              .reading hr{ border:none; border-top:1px solid #e2e8f0; margin:2rem 0; }
+              .reading table{
+                width:100%; border-collapse:collapse; font-size:.95em; margin:1rem 0;
+              }
+              .reading th, .reading td{
+                border:1px solid #e2e8f0; padding:.6rem .7rem; text-align:left;
+              }
+              .reading a{ color:#0ea5e9; text-decoration:none }
+              .reading a:hover{ text-decoration:underline }
             `}</style>
 
+            {/* Nội dung (giữ nguyên cơ chế render) */}
             <div
-              className="news-body"
-              dangerouslySetInnerHTML={{ __html: contentHTML }}
+              className="reading"
+              dangerouslySetInnerHTML={{
+                __html: post.content || post.excerpt || "",
+              }}
             />
           </article>
         </div>
