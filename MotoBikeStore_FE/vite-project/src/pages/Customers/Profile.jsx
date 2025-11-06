@@ -1,3 +1,4 @@
+// src/pages/Customers/Profile.jsx
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -84,17 +85,12 @@ export default function Profile() {
     setSaving(true);
     try {
       const fd = new FormData();
-      fd.append("name", form.name || "");         // 👈 Laravel nhận được
+      fd.append("name", form.name || "");
       fd.append("phone", form.phone || "");
       fd.append("address", form.address || "");
-      // Nếu cho phép đổi email/username thì mở 2 dòng dưới:
-      // fd.append("email", form.email || "");
-      // fd.append("username", form.username || "");
-
+      // fd.append("_method", "PUT"); // mở nếu route backend là PUT/PATCH
       if (form.avatar) fd.append("avatar", form.avatar);
 
-      // ✅ GỬI POST (FormData). Nếu API đang là PUT, spoof như sau:
-      // fd.append("_method", "PUT");  // mở nếu route backend là PUT/PATCH
       const res = await fetch(`${API}/api/profile`, {
         method: "POST",
         headers: {
@@ -106,15 +102,13 @@ export default function Profile() {
 
       const data = await res.json().catch(() => ({}));
       if (!res.ok || data?.success === false) {
-        // Lấy message validation từ Laravel
-        const msg =
+        const m =
           data?.message ||
           Object.values(data?.errors || {})[0]?.[0] ||
           "Cập nhật thất bại";
-        throw new Error(msg);
+        throw new Error(m);
       }
 
-      // Lưu lại user mới
       localStorage.setItem("customer_user", JSON.stringify(data.user));
       window.dispatchEvent(new Event("user:refresh"));
 
@@ -128,37 +122,57 @@ export default function Profile() {
 
   if (loading) return <div className="u-card u-border p-4">⏳ Đang tải hồ sơ…</div>;
 
+  /* ===== LIGHT THEME styles (giữ nguyên cấu trúc) ===== */
   const card = {
-    border: "1px solid rgba(148,163,184,.25)",
-    background: "linear-gradient(180deg, rgba(15,23,42,.55), rgba(2,6,23,.65))",
-    color: "#e5e7eb",
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    color: "#0f172a",
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.06)",
+    boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 8px 30px rgba(17,24,39,.06)",
   };
-  const label = { display: "block", marginBottom: 6, fontSize: 13, fontWeight: 600, opacity: .92 };
+  const label = {
+    display: "block",
+    marginBottom: 6,
+    fontSize: 13,
+    fontWeight: 600,
+    opacity: .95,
+    color: "#334155",
+  };
   const input = {
-    width: "100%", height: 44, padding: "10px 14px", borderRadius: 12,
-    border: "1px solid rgba(148,163,184,.28)", background: "rgba(2,6,23,.6)",
-    color: "#e5e7eb", outline: "none",
+    width: "100%",
+    height: 44,
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "1px solid #e5e7eb",
+    background: "#ffffff",
+    color: "#0f172a",
+    outline: "none",
+    boxShadow: "inset 0 1px 2px rgba(0,0,0,.03)",
   };
   const row = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 };
 
   return (
     <div className="u-card u-border" style={card}>
-      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#f8fafc" }}>Hồ sơ của tôi</h2>
-      <p style={{ marginTop: 6, opacity: .8, fontSize: 13.5 }}>Cập nhật thông tin cá nhân và ảnh đại diện.</p>
+      <h2 style={{ margin: 0, fontSize: 22, fontWeight: 900, color: "#0f172a" }}>
+        Hồ sơ của tôi
+      </h2>
+      <p style={{ marginTop: 6, opacity: .85, fontSize: 13.5, color: "#334155" }}>
+        Cập nhật thông tin cá nhân và ảnh đại diện.
+      </p>
 
       {msg && (
         <div
           className="u-card u-border"
           style={{
-            marginTop: 12, padding: 10, borderRadius: 12,
-            border: `1px solid ${msg.startsWith("✅") ? "rgba(16,185,129,.5)" : "rgba(239,68,68,.5)"}`,
+            marginTop: 12,
+            padding: 10,
+            borderRadius: 12,
+            border: `1px solid ${msg.startsWith("✅") ? "#86efac" : "#fecaca"}`,
             background: msg.startsWith("✅")
-              ? "linear-gradient(180deg, rgba(6,78,59,.25), rgba(2,44,34,.25))"
-              : "linear-gradient(180deg, rgba(127,29,29,.25), rgba(69,10,10,.25))",
-            color: msg.startsWith("✅") ? "#A7F3D0" : "#FECACA",
+              ? "linear-gradient(180deg, #ecfdf5, #dcfce7)"
+              : "linear-gradient(180deg, #fff1f2, #ffe4e6)",
+            color: msg.startsWith("✅") ? "#166534" : "#991b1b",
             fontSize: 13.5,
           }}
         >
@@ -171,9 +185,15 @@ export default function Profile() {
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div
             style={{
-              width: 120, height: 120, borderRadius: "50%", overflow: "hidden",
-              border: "2px solid rgba(255,255,255,.15)", background: "rgba(2,6,23,.5)",
-              boxShadow: "0 10px 30px rgba(0,0,0,.35)", display: "grid", placeItems: "center",
+              width: 120,
+              height: 120,
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: "2px solid #e5e7eb",
+              background: "#f8fafc",
+              boxShadow: "0 6px 16px rgba(0,0,0,.08)",
+              display: "grid",
+              placeItems: "center",
             }}
           >
             {preview ? (
@@ -196,11 +216,25 @@ export default function Profile() {
           </div>
 
           <div style={{ display: "grid", gap: 8 }}>
-            <label className="u-btn outline" style={{ width: "fit-content", padding: "8px 12px", cursor: "pointer" }}>
+            <label
+              className="u-btn outline"
+              style={{
+                width: "fit-content",
+                padding: "8px 12px",
+                cursor: "pointer",
+                background: "#f8fafc",
+                borderColor: "#e5e7eb",
+                color: "#0f172a",
+                borderRadius: 12,
+                fontWeight: 700,
+              }}
+            >
               Chọn ảnh…
               <input type="file" accept="image/*" onChange={onFile} style={{ display: "none" }} />
             </label>
-            <small style={{ opacity: .8 }}>Hỗ trợ JPEG/PNG/WEBP/AVIF. Tối đa 2MB.</small>
+            <small style={{ opacity: .85, color: "#334155" }}>
+              Hỗ trợ JPEG/PNG/WEBP/AVIF. Tối đa 2MB.
+            </small>
           </div>
         </div>
 
@@ -238,11 +272,16 @@ export default function Profile() {
             className="u-btn"
             disabled={saving}
             style={{
-              height: 44, borderRadius: 12,
-              border: "1px solid rgba(16,185,129,.55)",
-              background: "linear-gradient(180deg, rgba(16,185,129,.35), rgba(5,150,105,.4))",
-              color: "#ecfdf5", fontWeight: 800, letterSpacing: .3,
-              cursor: saving ? "not-allowed" : "pointer", opacity: saving ? .7 : 1,
+              height: 44,
+              borderRadius: 12,
+              border: "1px solid #10b981",
+              background: "linear-gradient(180deg, #34d399, #10b981)",
+              color: "white",
+              fontWeight: 800,
+              letterSpacing: .3,
+              cursor: saving ? "not-allowed" : "pointer",
+              opacity: saving ? .7 : 1,
+              boxShadow: "0 6px 18px rgba(16,185,129,.25)",
             }}
           >
             {saving ? "⏳ Đang lưu..." : "💾 Lưu thay đổi"}
@@ -253,9 +292,12 @@ export default function Profile() {
             className="u-btn outline"
             onClick={() => navigate(-1)}
             style={{
-              height: 44, borderRadius: 12,
-              border: "1px solid rgba(148,163,184,.35)", background: "transparent",
-              color: "#e5e7eb", fontWeight: 700,
+              height: 44,
+              borderRadius: 12,
+              border: "1px solid #e5e7eb",
+              background: "#f8fafc",
+              color: "#0f172a",
+              fontWeight: 700,
             }}
           >
             ← Quay lại

@@ -1,7 +1,9 @@
+// src/pages/Customers/ProductDetail.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { toVNDateTime } from "../../utils/time";
 import ProductReview from "../../components/ProductReview";
+
 const API_ROOT = "http://127.0.0.1:8000";
 const API_A = `${API_ROOT}/api`;
 const API_B = `${API_ROOT}`;
@@ -9,7 +11,7 @@ const PLACEHOLDER = "https://placehold.co/800x600?text=No+Image";
 
 /* ================= Helpers ================= */
 
-// Bỏ mọi ký tự không phải số (., đ, khoảng trắng...)
+// Bỏ mọi ký tự không phải số
 const toMoneyNumber = (v) => {
   if (v === null || v === undefined) return 0;
   const s = String(v).replace(/[^\d-]/g, "");
@@ -17,7 +19,7 @@ const toMoneyNumber = (v) => {
   return Number.isFinite(n) ? n : 0;
 };
 
-// Trả về { val, key } để biết khóa nào match
+// Trả về { val, key }
 const pickWithKey = (obj, keys) => {
   for (const k of keys) {
     if (!obj) break;
@@ -29,15 +31,15 @@ const pickWithKey = (obj, keys) => {
   return { val: 0, key: "" };
 };
 
-// Hợp nhất các trường giá bị thiếu (ưu tiên giữ giá trị đã có)
+// Hợp nhất trường giá bị thiếu
 const mergePriceFields = (target, source) => {
   if (!target || !source) return target;
   const keys = [
-    "price_root", "original_price", "old_price", "gia_goc", "gia_niem_yet",
-    "base_price", "unit_price", "price_out",
-    "price_sale", "sale_price", "discount_price", "promotion_price", "priceSale",
-    "gia_km", "giam_gia",
-    "price", "final_price", "gia_ban", "gia_hien_tai", "gia"
+    "price_root","original_price","old_price","gia_goc","gia_niem_yet",
+    "base_price","unit_price","price_out",
+    "price_sale","sale_price","discount_price","promotion_price","priceSale",
+    "gia_km","giam_gia",
+    "price","final_price","gia_ban","gia_hien_tai","gia"
   ];
   for (const k of keys) {
     if (target[k] === undefined || target[k] === null || target[k] === 0 || target[k] === "0") {
@@ -52,15 +54,15 @@ const mergePriceFields = (target, source) => {
 // Chuẩn hoá giá cho UI
 const getPrices = (o) => {
   const basePick = pickWithKey(o, [
-    "price_root", "original_price", "old_price", "gia_goc",
-    "gia_niem_yet", "base_price", "unit_price", "price_out",
+    "price_root","original_price","old_price","gia_goc",
+    "gia_niem_yet","base_price","unit_price","price_out",
   ]);
   const nowPick  = pickWithKey(o, [
-    "price", "final_price", "gia_ban", "gia_hien_tai", "gia",
+    "price","final_price","gia_ban","gia_hien_tai","gia",
   ]);
   const salePick = pickWithKey(o, [
-    "price_sale", "sale_price", "discount_price", "promotion_price",
-    "priceSale", "gia_km", "giam_gia",
+    "price_sale","sale_price","discount_price","promotion_price",
+    "priceSale","gia_km","giam_gia",
   ]);
 
   let now = nowPick.val || 0;
@@ -75,7 +77,7 @@ const getPrices = (o) => {
 };
 
 /* ==== Cart helpers ==== */
-const CART_KEYS = ["cart", "cart_items", "shopping_cart", "mbs_cart", "CART"];
+const CART_KEYS = ["cart","cart_items","shopping_cart","mbs_cart","CART"];
 function readCart() {
   for (const k of CART_KEYS) {
     try {
@@ -90,16 +92,11 @@ function writeCart(key, items) {
 }
 function normalizeForCart(p) {
   const src = p?.raw ? { ...p.raw, ...p } : p || {};
-  const id =
-    src.id ?? src.product_id ?? src.productId ?? src.slug ?? src.code ?? null;
+  const id = src.id ?? src.product_id ?? src.productId ?? src.slug ?? src.code ?? null;
   const name = src.name ?? src.title ?? "";
   const { now } = getPrices(src);
   const thumb =
-    src.thumbnail_url ||
-    src.thumbnail ||
-    src.image_url ||
-    src.image ||
-    PLACEHOLDER;
+    src.thumbnail_url || src.thumbnail || src.image_url || src.image || PLACEHOLDER;
 
   return { id, name, price: now, image: thumb, thumbnail_url: thumb, qty: 1 };
 }
@@ -111,7 +108,7 @@ function Stars({ value = 0 }) {
   const half = v - full >= 0.5 ? 1 : 0;
   const empty = 5 - full - half;
   return (
-    <span style={{ display: "inline-flex", gap: 2, color: "#f8d26b", alignItems: "center" }}>
+    <span style={{ display: "inline-flex", gap: 2, color: "#f59e0b", alignItems: "center" }}>
       {Array.from({ length: full }).map((_, i) => <span key={"f"+i}>★</span>)}
       {half ? <span>☆</span> : null}
       {Array.from({ length: empty }).map((_, i) => <span key={"e"+i} style={{ opacity: .3 }}>★</span>)}
@@ -121,13 +118,11 @@ function Stars({ value = 0 }) {
 }
 
 /* ================= Fetchers ================= */
-
 async function getJSON(url) {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   try { return await res.json(); } catch { return {}; }
 }
-
 async function fetchDetail(pid) {
   for (const url of [`${API_A}/products/${pid}`, `${API_B}/products/${pid}`]) {
     try {
@@ -137,7 +132,6 @@ async function fetchDetail(pid) {
   }
   return null;
 }
-
 async function fetchListAndFind(pid) {
   for (const url of [`${API_A}/products`, `${API_B}/products`]) {
     try {
@@ -149,7 +143,6 @@ async function fetchListAndFind(pid) {
   }
   return null;
 }
-
 async function getJSONSafe(url, init) {
   try {
     const res = await fetch(url, init);
@@ -161,7 +154,6 @@ async function getJSONSafe(url, init) {
 }
 
 /* ================= Page ================= */
-
 export default function ProductDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -171,7 +163,7 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
 
-  // ===== TÓM TẮT rating (để hiển thị ở phần trên) =====
+  // rating summary
   const [avg, setAvg] = useState(0);
   const [count, setCount] = useState(0);
 
@@ -181,11 +173,9 @@ export default function ProductDetail() {
       try {
         setLoading(true);
         setErr("");
-
         // 1) Chi tiết
         let p = await fetchDetail(id);
-
-        // 2) Nếu thiếu trường giá gốc/sale → bù từ list
+        // 2) Bù trường giá còn thiếu
         const hasBase =
           toMoneyNumber(p?.price_root ?? p?.original_price ?? p?.old_price ?? p?.gia_goc ?? 0) > 0;
         const hasSale =
@@ -240,7 +230,7 @@ export default function ProductDetail() {
     return () => { alive = false; };
   }, [id]);
 
-  // --- Load tóm tắt rating (avg/count) ---
+  // rating summary
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -298,28 +288,31 @@ export default function ProductDetail() {
   };
 
   if (loading) return <div style={{ padding: 20 }}>Đang tải chi tiết…</div>;
-  if (err) return <div style={{ padding: 20, color: "#f87171" }}>{err}</div>;
+  if (err) return <div style={{ padding: 20, color: "#ef4444" }}>{err}</div>;
   if (!data) return <div style={{ padding: 20 }}>Không tìm thấy sản phẩm.</div>;
 
   return (
     <div style={{ padding: 16 }}>
       <style>{`
+        :root { --border: #e5e7eb; }
+
         .pd-grid { display:grid; grid-template-columns: 1.1fr 1fr; gap:24px; }
         @media (max-width: 1024px) { .pd-grid{ grid-template-columns: 1fr; } }
 
         .pd-frame {
-          background:#fff; border:1px solid var(--border); border-radius:14px;
+          background:#ffffff; border:1px solid var(--border); border-radius:14px;
           height:clamp(340px, 50vh, 560px); aspect-ratio: 4/3;
           display:grid; place-items:center; overflow:hidden;
+          box-shadow: 0 1px 2px rgba(0,0,0,.04);
         }
         .pd-frame > img{ width:100%; height:100%; object-fit:contain; }
 
         .pd-price-row{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; }
-        .pd-price-sale{ font-size:26px; font-weight:800; }
-        .pd-price-old{ font-size:16px; text-decoration:line-through; opacity:.7; }
+        .pd-price-sale{ font-size:26px; font-weight:800; color:#0f172a; }
+        .pd-price-old{ font-size:16px; text-decoration:line-through; opacity:.7; color:#64748b; }
         .pd-badge{
           font-size:12px; font-weight:700; padding:2px 8px; border-radius:999px;
-          border:1px solid var(--border); background:rgba(2,6,23,.35);
+          border:1px solid var(--border); background:#f1f5f9; color:#0f172a;
         }
 
         .rel-grid{ display:grid; gap:16px; grid-template-columns: repeat(4, minmax(0,1fr)); }
@@ -327,18 +320,18 @@ export default function ProductDetail() {
         @media (max-width: 900px){ .rel-grid{ grid-template-columns: repeat(2,1fr); } }
         @media (max-width: 560px){ .rel-grid{ grid-template-columns: 1fr; } }
 
-        .rel-card { display:grid; gap:10px; padding:12px; }
-        .rel-img { background:#fff; border:1px solid var(--border); border-radius:12px;
+        .rel-card { display:grid; gap:10px; padding:12px; background:#ffffff; }
+        .rel-img { background:#ffffff; border:1px solid var(--border); border-radius:12px;
           width:100%; aspect-ratio: 4/3; overflow:hidden; display:grid; place-items:center; }
         .rel-img > img { width:100%; height:100%; object-fit:contain; }
-        .rel-name{ font-weight:700; line-height:1.3; min-height:2.6em; }
-        .rel-price{ font-weight:800; }
-        .rel-old{ margin-left:8px; text-decoration:line-through; opacity:.7; font-size:12px; }
+        .rel-name{ font-weight:700; line-height:1.3; min-height:2.6em; color:#0f172a; }
+        .rel-price{ font-weight:800; color:#0f172a; }
+        .rel-old{ margin-left:8px; text-decoration:line-through; opacity:.7; font-size:12px; color:#64748b; }
         .rel-actions{ display:flex; gap:8px; }
       `}</style>
 
       {/* Chi tiết */}
-      <div className="u-card u-border" style={{ padding: 16 }}>
+      <div className="u-card u-border" style={{ padding: 16, background: "#ffffff", borderColor: "#e5e7eb" }}>
         <div className="pd-grid">
           <div className="pd-frame">
             <img
@@ -349,13 +342,20 @@ export default function ProductDetail() {
           </div>
 
           <div style={{ display: "grid", alignContent: "start", gap: 16 }}>
-            <h1 style={{ margin: 0 }}>{data?.name}</h1>
+            <h1 style={{ margin: 0, color: "#0f172a" }}>{data?.name}</h1>
 
+            {/* block Giá */}
             <div
               className="u-card u-border"
-              style={{ padding: 12, background: "rgba(2,6,23,.35)" }}
+              style={{
+                padding: 12,
+                background: "#f8fafc",
+                borderColor: "#e5e7eb",
+                color: "#0f172a",
+                borderRadius: 12,
+              }}
             >
-              <div style={{ fontSize: 15, opacity: 0.9, marginBottom: 6 }}>
+              <div style={{ fontSize: 15, opacity: 0.9, marginBottom: 6, color: "#334155" }}>
                 Giá
               </div>
 
@@ -379,13 +379,30 @@ export default function ProductDetail() {
             </div>
 
             {/* Tóm tắt rating */}
-            <div className="u-card u-border" style={{ padding: 12, display: "flex", alignItems: "center", gap: 10 }}>
+            <div
+              className="u-card u-border"
+              style={{
+                padding: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                background: "#ffffff",
+                borderColor: "#e5e7eb",
+                borderRadius: 12,
+                color: "#0f172a",
+              }}
+            >
               <b>Đánh giá:</b> <Stars value={avg} />
-              <span className="u-chip">{count} đánh giá</span>
+              <span className="u-chip" style={{ background: "#f1f5f9", borderColor: "#e5e7eb", color: "#0f172a" }}>
+                {count} đánh giá
+              </span>
             </div>
 
             {data?.description && (
-              <div className="u-card u-border" style={{ padding: 12 }}>
+              <div
+                className="u-card u-border"
+                style={{ padding: 12, background: "#ffffff", borderColor: "#e5e7eb", borderRadius: 12, color: "#0f172a" }}
+              >
                 {data.description}
               </div>
             )}
@@ -402,20 +419,22 @@ export default function ProductDetail() {
         </div>
       </div>
 
-      {/* ======= PHẦN REVIEW (ĐÃ TÁCH RIÊNG) ======= */}
-      <div className="u-card u-border" style={{ padding: 16, marginTop: 16 }}>
+      {/* Reviews */}
+      <div className="u-card u-border" style={{ padding: 16, marginTop: 16, background: "#ffffff", borderColor: "#e5e7eb" }}>
         <ProductReview />
       </div>
 
       {/* Liên quan */}
-      <div className="u-card u-border" style={{ padding: 16, marginTop: 16 }}>
+      <div className="u-card u-border" style={{ padding: 16, marginTop: 16, background: "#ffffff", borderColor: "#e5e7eb" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-          <h3 style={{ margin: 0 }}>Sản phẩm liên quan</h3>
-          <span className="u-chip">{related.length}</span>
+          <h3 style={{ margin: 0, color: "#0f172a" }}>Sản phẩm liên quan</h3>
+          <span className="u-chip" style={{ background: "#f1f5f9", borderColor: "#e5e7eb", color: "#0f172a" }}>
+            {related.length}
+          </span>
         </div>
 
         {related.length === 0 ? (
-          <div style={{ opacity: 0.7, padding: "8px 0" }}>
+          <div style={{ opacity: 0.7, padding: "8px 0", color: "#334155" }}>
             Chưa có sản phẩm liên quan.
           </div>
         ) : (
@@ -427,7 +446,7 @@ export default function ProductDetail() {
               const img = (p.thumbnail_url && p.thumbnail_url.trim()) || PLACEHOLDER;
 
               return (
-                <div key={p.id} className="u-card u-border u-hover rel-card">
+                <div key={p.id} className="u-card u-border u-hover rel-card" style={{ borderColor: "#e5e7eb" }}>
                   <Link to={`/products/${p.id}`} className="rel-img">
                     <img
                       src={img}
@@ -439,7 +458,7 @@ export default function ProductDetail() {
                   <Link
                     to={`/products/${p.id}`}
                     className="rel-name"
-                    style={{ color: "inherit", textDecoration: "none" }}
+                    style={{ color: "#0f172a", textDecoration: "none" }}
                   >
                     {p.name}
                   </Link>
