@@ -9,7 +9,7 @@ export default function Blog() {
     (async () => {
       try {
         const r = await fetch(`${API}/posts?per_page=20`);
-        const j = await r.json();
+        const j = await r.json().catch(() => ({}));
         setPosts(j?.data || j || []);
       } finally {
         setLoading(false);
@@ -18,30 +18,24 @@ export default function Blog() {
   }, []);
 
   return (
-    <main className="min-h-[70vh] bg-white">
+    <main className="bg-white">
       <section className="max-w-6xl mx-auto px-4 py-12">
         <div className="text-center mb-8">
           <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-slate-200 bg-slate-50 text-sm text-slate-600">
             📰 Tin tức / Blog
           </span>
           <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-slate-900">
-            Cập nhật xu hướng & kinh nghiệm xe máy
+            Bài viết mới
           </h1>
           <p className="mt-2 text-slate-600">
-            Bài viết từ đội ngũ MotoBikeStore: đánh giá, mẹo dùng xe, khuyến mãi…
+            Cập nhật xu hướng xe máy, kinh nghiệm vận hành, bảo dưỡng và ưu đãi.
           </p>
         </div>
 
         {loading ? (
           <div className="grid md:grid-cols-3 gap-6">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="h-40 bg-slate-100" />
-                <div className="p-5">
-                  <div className="h-4 w-2/3 bg-slate-100 rounded mb-2" />
-                  <div className="h-4 w-full bg-slate-100 rounded" />
-                </div>
-              </div>
+              <div key={i} className="h-56 rounded-2xl bg-slate-100 border border-slate-200 animate-pulse" />
             ))}
           </div>
         ) : (
@@ -60,17 +54,26 @@ export default function Blog() {
                   />
                 )}
                 <div className="p-5">
-                  <h2 className="text-lg font-semibold text-slate-900 line-clamp-2">{p.title}</h2>
-                  <p className="text-sm text-slate-600 line-clamp-3 mt-2">{p.excerpt}</p>
+                  <h2 className="text-lg font-semibold text-slate-900 line-clamp-2">
+                    {p.title}
+                  </h2>
+                  <p className="text-sm text-slate-600 line-clamp-3 mt-2">
+                    {p.excerpt}
+                  </p>
                   <a
                     href={`/blog/${p.slug || p.id}`}
-                    className="inline-flex items-center gap-1 mt-3 text-emerald-600 hover:text-emerald-700 font-semibold"
+                    className="inline-block mt-3 text-emerald-600 hover:text-emerald-700 font-semibold"
                   >
                     Đọc tiếp →
                   </a>
                 </div>
               </article>
             ))}
+            {!posts.length && (
+              <div className="col-span-full text-center text-slate-500">
+                Chưa có bài viết.
+              </div>
+            )}
           </div>
         )}
       </section>
