@@ -474,6 +474,50 @@ export default function Checkout({ cart = [], setCart }) {
 .input{min-width:240px}
 .coupon{display:flex;gap:8px;align-items:center}
 .hint{display:flex;gap:8px;align-items:center;margin-top:8px}
+
+/* ----- Light overrides cho Checkout ----- */
+.checkoutX .u-input,
+.checkoutX select.u-input,
+.checkoutX textarea.u-input {
+  background:#ffffff !important;
+  color:#0f172a !important;
+  border:1px solid #e5e7eb !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,.03);
+}
+
+.checkoutX .u-input::placeholder {
+  color:#94a3b8;
+}
+
+.checkoutX .u-input:disabled {
+  background:#f1f5f9 !important;
+  color:#64748b !important;
+}
+
+/* Card & header sáng để đồng bộ */
+.checkoutX .card{
+  background:#ffffff !important;
+  border:1px solid #e5e7eb !important;
+  color:#0f172a;
+}
+.checkoutX .card-hd{
+  background:#ffffff !important;
+  border-bottom:1px solid #e5e7eb !important;
+}
+
+/* Tag/chip sáng */
+.checkoutX .tag{
+  background:#f8fafc !important;
+  border:1px solid #e5e7eb !important;
+  color:#334155 !important;
+}
+
+/* Sticky bar sáng */
+.checkoutX .bar{
+  background:linear-gradient(180deg,#ffffff,#ffffff) !important;
+  border:1px solid #e5e7eb !important;
+}
+
   `;
 
   return (

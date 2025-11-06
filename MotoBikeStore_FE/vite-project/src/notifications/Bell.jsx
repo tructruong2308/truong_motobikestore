@@ -64,9 +64,7 @@ export default function Bell() {
     setOpen(false);
 
     if (location.pathname === "/orders") {
-      window.dispatchEvent(
-        new CustomEvent("focus:order", { detail: { id: Number(id) } })
-      );
+      window.dispatchEvent(new CustomEvent("focus:order", { detail: { id: Number(id) } }));
     } else {
       navigate(`/orders?focus=${id}#o${id}`);
     }
@@ -89,11 +87,12 @@ export default function Bell() {
           width: 40,
           height: 40,
           borderRadius: 10,
-          border: "1px solid #233",
-          background: "#0f172a",
-          color: "#e5e7eb",
+          border: "1px solid #e5e7eb",
+          background: "#ffffff",
+          color: "#0f172a",
           position: "relative",
           cursor: "pointer",
+          boxShadow: "0 1px 2px rgba(0,0,0,.04)",
         }}
       >
         🔔
@@ -109,6 +108,8 @@ export default function Bell() {
               padding: "2px 6px",
               fontSize: 12,
               fontWeight: 800,
+              border: "1px solid #fff",
+              boxShadow: "0 1px 2px rgba(0,0,0,.08)",
             }}
           >
             {unread}
@@ -125,25 +126,27 @@ export default function Bell() {
             width: 360,
             maxHeight: 440,
             overflow: "auto",
-            background: "#0b1220",
-            border: "1px solid #233",
+            background: "#ffffff",
+            border: "1px solid #e5e7eb",
             borderRadius: 12,
-            boxShadow: "0 8px 30px rgba(0,0,0,.35)",
+            boxShadow: "0 8px 30px rgba(17,24,39,.08)",
             zIndex: 1000,
+            color: "#0f172a",
           }}
         >
           <div
             style={{
               padding: "10px 12px",
-              borderBottom: "1px solid #233",
+              borderBottom: "1px solid #e5e7eb",
               fontWeight: 800,
+              background: "#ffffff",
             }}
           >
             Thông báo
           </div>
 
           {items.length === 0 ? (
-            <div style={{ padding: 12, opacity: 0.7 }}>Chưa có thông báo</div>
+            <div style={{ padding: 12, color: "#64748b" }}>Chưa có thông báo</div>
           ) : (
             items.map((n) => (
               <button
@@ -156,15 +159,15 @@ export default function Bell() {
                   background: "transparent",
                   border: 0,
                   padding: 12,
-                  borderBottom: "1px dashed #233",
+                  borderBottom: "1px dashed #e5e7eb",
                   cursor: "pointer",
                 }}
               >
-                <div style={{ fontWeight: 700 }}>{n.title}</div>
+                <div style={{ fontWeight: 700, color: "#0f172a" }}>{n.title}</div>
                 {n.message && (
-                  <div style={{ opacity: 0.85, fontSize: 13 }}>{n.message}</div>
+                  <div style={{ color: "#475569", fontSize: 13 }}>{n.message}</div>
                 )}
-                <div style={{ opacity: 0.6, fontSize: 12, marginTop: 4 }}>
+                <div style={{ color: "#94a3b8", fontSize: 12, marginTop: 4 }}>
                   {new Date(n.time).toLocaleString()}
                 </div>
               </button>
