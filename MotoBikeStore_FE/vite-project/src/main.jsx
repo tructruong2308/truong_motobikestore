@@ -44,7 +44,7 @@ import ProductAdd from "./pages/Admin/Product/ProductAdd";
 import ProductEdit from "./pages/Admin/Product/ProductEdit";
 import AdminCoupons from "./pages/Admin/Coupon/Coupons";
 import AdminContacts from "./pages/Admin/Contact/Contacts";
-import AdminPosts from "./pages/Admin/Post/Posts";
+import AdminPosts from "./pages/Admin/Posts/Posts";
 
 /* NEW: header search with suggestions */
 import HeaderSearch from "./components/HeaderSearch";
