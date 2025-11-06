@@ -29,10 +29,10 @@ import Login from "./pages/Customers/Login";
 import Checkout from "./pages/Customers/Checkout";
 import Profile from "./pages/Customers/Profile";
 import Orders from "./pages/Customers/Orders";
-import About from "./pages/Static/About";
-import Contact from "./pages/Static/Contact";
-import Blog from "./pages/Static/Blog";
-import BlogDetail from "./pages/Static/BlogDetail";
+import About from "./pages/Customers/About";
+import Contact from "./pages/Customers/Contact";
+import Blog from "./pages/Customers/Blog";
+import BlogDetail from "./pages/Customers/BlogDetail";
 
 
 /* Admin pages */
