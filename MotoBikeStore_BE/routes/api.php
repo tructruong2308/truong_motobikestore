@@ -109,11 +109,13 @@ Route::middleware(['auth:sanctum','is_admin'])->prefix('admin')->group(function 
     Route::patch ('/coupons/{id}/toggle',[CouponController::class, 'toggle']);
 
     // Contacts (ADMIN) – thêm mới
-    Route::get   ('/contacts',            [ContactController::class, 'index']);
-    Route::get   ('/contacts/{id}',       [ContactController::class, 'show']);
-    Route::patch ('/contacts/{id}/resolve',[ContactController::class, 'resolve']); // đánh dấu đã xử lý
-    Route::delete('/contacts/{id}',       [ContactController::class, 'destroy']);
-
+    Route::get   ('/contacts',                 [ContactController::class, 'index']);
+    Route::get   ('/contacts/{contact}',       [ContactController::class, 'show']);
+    Route::patch ('/contacts/{contact}/read',  [ContactController::class, 'markRead']);
+    Route::patch ('/contacts/{contact}/done',  [ContactController::class, 'markDone']);
+    // Nếu FE dùng 1 endpoint chung:
+    // Route::patch ('/contacts/{contact}',       [ContactController::class, 'resolve']);
+    Route::delete('/contacts/{contact}',       [ContactController::class, 'destroy']);
 });
 
 /* 404 */
