@@ -632,6 +632,8 @@ function App() {
             <Route path="orders" element={<AdminOrders />} />
             <Route path="users" element={<AdminUsers />} />
             <Route path="coupons" element={<AdminCoupons />} />
+            <Route path="contacts" element={<AdminCoupons />} />
+
           </Route>
 
           {/* 404 */}
