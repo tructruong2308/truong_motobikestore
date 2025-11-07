@@ -32,7 +32,6 @@ export default function ProductCard({ p, onAdd }) {
       </div>
 
       <div className="product-actions">
-        <button className="u-btn" onClick={add}>Thêm giỏ</button>
         <Link className="u-btn ghost" to={`/products/${p.id}`}>Xem</Link>
       </div>
     </div>
