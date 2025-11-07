@@ -200,15 +200,19 @@ class ChatController extends Controller
                 $parts = [];
                 foreach ($m['contentParts'] as $p) {
                     $type = $p['type'] ?? '';
-                    if ($type === 'text') $parts[] = ['type'=>'text','text'=>(string)($p['text'] ?? '')];
-                    elseif ($type === 'image_url') {
+                    if ($type === 'text') {
+                        $parts[] = ['type' => 'text', 'text' => (string)($p['text'] ?? '')];
+                    } elseif ($type === 'image_url') {
+                        // ✅ ĐÚNG CHUẨN v0.7
                         $url = is_array($p['image_url']) ? ($p['image_url']['url'] ?? '') : ($p['image_url'] ?? '');
-                        if ($url) $parts[] = ['type'=>'input_image','image_url'=>$url];
+                        if ($url) {
+                            $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $url]];
+                        }
                     }
                 }
-                return ['role'=>$m['role'] ?? 'user','content'=>$parts];
+                return ['role' => $m['role'] ?? 'user', 'content' => $parts];
             }
-            return ['role'=>$m['role'] ?? 'user','content'=>(string)($m['content'] ?? '')];
+            return ['role' => $m['role'] ?? 'user', 'content' => (string)($m['content'] ?? '')];
         }, $messages);
     }
 
@@ -262,7 +266,6 @@ class ChatController extends Controller
                     'sort'        => 'price-asc'
                 ];
 
-                // Nếu có ngân sách/hãng/loại → searchAdvanced; nếu không → findRelevant/featured
                 $hasStrongFilter = $filters['min']!==null || $filters['max']!==null
                     || !empty($filters['brandNames']) || !empty($filters['categoryHints'])
                     || !empty($flags['onSale']) || !empty($flags['inStock']) || $ccMin!==null;
@@ -327,8 +330,9 @@ class ChatController extends Controller
             $count = 0;
             foreach ($catalog as $p) {
                 if (!empty($p['thumbnail_url'])) {
-                    $parts[] = ['type'=>'input_image','image_url'=>$p['thumbnail_url']];
-                    $parts[] = ['type'=>'text','text'=>"{$p['name']} — giá {$p['price']}"];
+                    // ✅ dùng image_url chuẩn
+                    $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $p['thumbnail_url']]];
+                    $parts[] = ['type' => 'text', 'text' => "{$p['name']} — giá {$p['price']}"];
                     if (++$count >= 2) break;
                 }
             }
