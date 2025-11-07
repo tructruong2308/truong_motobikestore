@@ -49,6 +49,7 @@ Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
 /* Chat with AI */
 Route::post('/chat', [ChatController::class, 'chat']);          // non-stream
 Route::get('/chat/stream', [ChatController::class, 'stream']);  // SSE stream
+Route::post('/chat/upload', [ChatController::class, 'uploadImage']); 
 
 /* ---------- CUSTOMER (Sanctum) ---------- */
 Route::middleware(['auth:sanctum'])->group(function () {
