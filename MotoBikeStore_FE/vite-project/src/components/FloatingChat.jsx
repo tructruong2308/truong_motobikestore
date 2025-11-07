@@ -3,14 +3,19 @@ import { useEffect, useRef, useState } from "react";
 const API = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
 const FILE_BASE = API.replace(/\/api\/?$/, ""); // http://host:port
 
-// ====== Lấy thông tin khách hàng đăng nhập từ localStorage ======
+/* ========== helpers user & token ========== */
 const getCustomer = () => {
   try { return JSON.parse(localStorage.getItem("customer_user") || "null"); }
   catch { return null; }
 };
+const getToken = () => localStorage.getItem("customer_token") || "";
+const authHeader = () => {
+  const t = getToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 const resolveAvatar = (u) => {
   if (!u) return null;
-  if (u.avatar_url) return u.avatar_url; // BE đã trả URL tuyệt đối
+  if (u.avatar_url) return u.avatar_url;
   if (typeof u.avatar === "string" && u.avatar.length) {
     if (/^https?:\/\//i.test(u.avatar)) return u.avatar;
     return `${FILE_BASE}/storage/${u.avatar.replace(/^\/+/, "")}`;
@@ -18,7 +23,7 @@ const resolveAvatar = (u) => {
   return null;
 };
 
-// ====== Visitor ID (ẩn danh) để gắn memory khi chưa login ======
+/* ========== visitor id (ẩn danh) ========== */
 const VISITOR_KEY = "visitor_id";
 const getVisitorId = () => {
   let v = localStorage.getItem(VISITOR_KEY);
@@ -26,47 +31,49 @@ const getVisitorId = () => {
   return v;
 };
 
-// ====== Lưu/khôi phục lịch sử chat (client) ======
-const LS_CHAT = "ai_chat_messages";
-const loadMsgs = () => {
+/* ========== local history theo từng user ========== */
+const chatKey = (uidOrAnon) => `ai_chat_messages_${uidOrAnon || "anon"}`;
+const loadMsgs = (uid) => {
   try {
-    const raw = JSON.parse(localStorage.getItem(LS_CHAT) || "[]");
+    const raw = JSON.parse(localStorage.getItem(chatKey(uid)) || "[]");
     return Array.isArray(raw) ? raw : [];
   } catch { return []; }
 };
-const saveMsgs = (msgs) => {
-  // chỉ lưu user/assistant để gọn
+const saveMsgs = (uid, msgs) => {
   const compact = msgs.filter(m => m.role === "user" || m.role === "assistant");
-  localStorage.setItem(LS_CHAT, JSON.stringify(compact));
+  localStorage.setItem(chatKey(uid), JSON.stringify(compact));
 };
 
-// ====== Avatar AI: dùng ảnh trong public/image/ ======
-const AI_AVATAR = "/image/ai.png"; // hãy đặt file vào public/image/ai.png
+/* ========== Avatar AI (public/image/ai.png) ========== */
+const AI_AVATAR = "/image/ai.png";
 
 export default function FloatingChat() {
   const [open, setOpen] = useState(true);
 
-  // Khôi phục lịch sử client
-  const [msgs, setMsgs] = useState(() => {
-    const restored = loadMsgs();
-    return [{ role: "system", content: "Bạn là trợ lý bán hàng." }, ...restored];
-  });
+  // user & avatar
+  const [userObj, setUserObj] = useState(() => getCustomer());
+  const [userAvatar, setUserAvatar] = useState(() => resolveAvatar(getCustomer()));
+  const userInitial = (userObj?.name || "?").trim().charAt(0).toUpperCase();
+  const userKey = userObj?.id || "anon";
+
+  // thread server (khi login)
+  const [threadId, setThreadId] = useState(null);
+
+  // lịch sử: system + local
+  const [msgs, setMsgs] = useState(() => [
+    { role: "system", content: "Bạn là trợ lý bán hàng." },
+    ...loadMsgs(userKey),
+  ]);
 
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
-  const [remember, setRemember] = useState(true); // Toggle "Nhớ tôi"
+  const [remember, setRemember] = useState(true);
 
-  // User avatar từ localStorage
-  const [userObj, setUserObj] = useState(() => getCustomer());
-  const [userAvatar, setUserAvatar] = useState(() => resolveAvatar(getCustomer()));
-  const userInitial = (userObj?.name || "?").trim().charAt(0).toUpperCase();
-
-  // Scroll
   const endRef = useRef(null);
   const scrollEnd = () => endRef.current?.scrollIntoView({ behavior: "smooth" });
 
-  // Đồng bộ user info khi login/logout
+  // đồng bộ user thay đổi (login/logout)
   useEffect(() => {
     const sync = () => {
       const u = getCustomer();
@@ -80,6 +87,36 @@ export default function FloatingChat() {
       window.removeEventListener("user:refresh", sync);
     };
   }, []);
+
+  // khi user đổi (login/logout): nạp local history của user đó
+  useEffect(() => {
+    const restored = loadMsgs(userKey);
+    setMsgs([{ role: "system", content: "Bạn là trợ lý bán hàng." }, ...restored]);
+  }, [userKey]);
+
+  // tạo/lấy thread + nạp lịch sử server khi đã login
+  useEffect(() => {
+    const boot = async () => {
+      if (!userObj?.id) { setThreadId(null); return; }
+      try {
+        // tạo/lấy thread
+        const t = await fetch(`${API}/chat/thread`, {
+          method: "POST",
+          headers: { ...authHeader() },
+        }).then(r => r.ok ? r.json() : null).catch(() => null);
+        if (!t?.id) return;
+        setThreadId(t.id);
+
+        // lấy history server
+        const hs = await fetch(`${API}/chat/thread/${t.id}`, {
+          headers: { ...authHeader() }
+        }).then(r => r.ok ? r.json() : []).catch(() => []);
+        // hs: [{role:'user'|'assistant', content:'...'}]
+        setMsgs([{ role: "system", content: "Bạn là trợ lý bán hàng." }, ...(Array.isArray(hs) ? hs : [])]);
+      } catch { /* ignore */ }
+    };
+    boot();
+  }, [userObj?.id]);
 
   // ESC để đóng
   useEffect(() => {
@@ -96,10 +133,10 @@ export default function FloatingChat() {
     document.head.appendChild(s);
   }, []);
 
-  // Lưu lịch sử chat mỗi khi thay đổi (bỏ system)
-  useEffect(() => { saveMsgs(msgs); }, [msgs]);
+  // lưu local mỗi khi đổi (bỏ system)
+  useEffect(() => { saveMsgs(userKey, msgs); }, [msgs, userKey]);
 
-  // ====== styles ======
+  /* ========== UI styles ========== */
   const z = 10000;
   const btn = {
     position: "fixed", right: 20, bottom: 20, width: 56, height: 56,
@@ -134,7 +171,7 @@ export default function FloatingChat() {
   });
   const imgThumb = { width: 180, height: "auto", borderRadius: 10, display: "block" };
 
-  // ====== render content: text + ảnh Markdown/link ảnh ======
+  /* ========== render text + ảnh markdown ========== */
   const renderContent = (text) => {
     const parts = [];
     const regex = /!\[[^\]]*\]\(([^)]+)\)|https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp)/gi;
@@ -157,14 +194,14 @@ export default function FloatingChat() {
     return parts.length ? parts : text;
   };
 
-  // ====== chọn & upload ảnh ======
+  /* ========== upload ảnh ========== */
   const pickImage = () => {
     const inputEl = document.createElement("input");
     inputEl.type = "file"; inputEl.accept = "image/*";
     inputEl.onchange = () => {
       const file = inputEl.files?.[0]; if (!file) return;
       const previewUrl = URL.createObjectURL(file);
-      setPendingImages((prev) => [...prev, { file, previewUrl, uploadedUrl: null }]);
+      setPendingImages(prev => [...prev, { file, previewUrl, uploadedUrl: null }]);
     };
     inputEl.click();
   };
@@ -174,13 +211,13 @@ export default function FloatingChat() {
     const j = await r.json(); return j?.url;
   };
 
-  // ====== làm sạch chunk stream (nếu BE từng json_encode) ======
+  /* ========== stream chunk sanitizer ========== */
   const cleanChunk = (raw) => {
     try { const s = JSON.parse(raw); if (typeof s === "string") return s; } catch {}
     return String(raw).replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
   };
 
-  // ====== gửi tin ======
+  /* ========== gửi tin ========== */
   const ask = async () => {
     if ((!input.trim() && pendingImages.length === 0) || streaming) return;
 
@@ -195,38 +232,52 @@ export default function FloatingChat() {
       );
     }
 
-    // hiển thị cho user (text + markdown ảnh)
+    // hiển thị cho user
     const userShowParts = [];
     if (input.trim()) userShowParts.push(input.trim());
-    if (uploaded.length) userShowParts.push(uploaded.map((u) => `![](${u.uploadedUrl || u.previewUrl})`).join("\n"));
+    if (uploaded.length) userShowParts.push(uploaded.map(u => `![](${u.uploadedUrl || u.previewUrl})`).join("\n"));
     const userShowText = userShowParts.filter(Boolean).join("\n");
 
-    const newMsgs = [...msgs, { role: "user", content: userShowText }, { role: "assistant", content: "" }];
-    setMsgs(newMsgs);
-    setInput(""); setPendingImages([]); setStreaming(true);
+    setMsgs(prev => [...prev, { role: "user", content: userShowText }]);
+    setInput(""); setPendingImages([]);
 
-    // gửi lên API: contentParts để Vision đọc ảnh
+    // ==== ĐÃ LOGIN + có thread → dùng API lưu lịch sử & trả lời ngay (non-stream) ====
+    if (userObj?.id && threadId) {
+      setStreaming(true);
+      try {
+        const res = await fetch(`${API}/chat/thread/${threadId}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({ text: userShowText })
+        }).then(r => r.json()).catch(() => ({ reply: "(lỗi server)" }));
+        setMsgs(prev => [...prev, { role: "assistant", content: res?.reply || "" }]);
+      } finally { setStreaming(false); }
+      return;
+    }
+
+    // ==== Ẩn danh → stream như cũ ====
     const contentParts = [];
     if (input.trim()) contentParts.push({ type: "text", text: input.trim() });
     for (const it of uploaded) if (it.uploadedUrl) contentParts.push({ type: "image_url", image_url: { url: it.uploadedUrl } });
 
-    // bỏ system khi gửi (server sẽ tự thêm system + memory + catalog)
-    const msgsForApi = [...msgs.filter((m) => m.role !== "system"), { role: "user", contentParts }];
+    const msgsForApi = [...msgs.filter(m => m.role !== "system"), { role: "user", contentParts }];
 
     const visitorId = getVisitorId();
     const url = new URL(`${API}/chat/stream`);
     url.searchParams.set("messages", JSON.stringify(msgsForApi));
     url.searchParams.set("use_db", remember ? "1" : "0");
-    url.searchParams.set("attach_images", remember ? "1" : "0"); // cho model “nhìn” ảnh sản phẩm từ DB
+    url.searchParams.set("attach_images", remember ? "1" : "0");
     url.searchParams.set("visitor_id", visitorId);
 
-    const idx = newMsgs.length - 1;
+    setStreaming(true);
+    setMsgs(prev => [...prev, { role: "assistant", content: "" }]);
+    const idx = (msgs.length + 1); // vị trí assistant vừa push
 
     const ev = new EventSource(url.toString());
     ev.onmessage = (e) => {
       if (e.data === "[DONE]") { ev.close(); setStreaming(false); return; }
       const chunk = cleanChunk(e.data);
-      setMsgs((prev) => {
+      setMsgs(prev => {
         const clone = [...prev];
         clone[idx] = { role: "assistant", content: (clone[idx]?.content || "") + chunk };
         return clone;
@@ -236,15 +287,13 @@ export default function FloatingChat() {
     ev.onerror = () => { ev.close(); setStreaming(false); };
   };
 
-  // ====== xoá bộ nhớ cơ bản (client trigger) ======
+  /* ========== clear memory (ẩn danh) ========== */
   const clearMemory = async () => {
     try {
       const v = getVisitorId();
       await fetch(`${API}/chat/memory/preference`, { method: "DELETE", headers: { "X-Visitor": v } });
       alert("Đã yêu cầu xoá ghi nhớ cơ bản (preference).");
-    } catch {
-      alert("Không xoá được memory. Kiểm tra API.");
-    }
+    } catch { alert("Không xoá được memory. Kiểm tra API."); }
   };
 
   return (
@@ -268,7 +317,7 @@ export default function FloatingChat() {
           </div>
 
           <div style={body}>
-            {msgs.filter((m) => m.role !== "system").map((m, i) => {
+            {msgs.filter(m => m.role !== "system").map((m, i) => {
               const me = m.role === "user";
               return (
                 <div key={i} style={row(me)}>
@@ -306,7 +355,6 @@ export default function FloatingChat() {
               </div>
             )}
 
-            {/* Preview ảnh chuẩn bị gửi */}
             {pendingImages.length > 0 && (
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0" }}>
                 {pendingImages.map((it, i) => (
@@ -332,14 +380,9 @@ export default function FloatingChat() {
         </div>
       )}
 
-      {/* FAB: hiển thị ảnh AI khi đóng, dấu × khi đang mở */}
-      <button onClick={() => setOpen((v) => !v)} style={btn} aria-label="Chat AI">
+      <button onClick={() => setOpen(v => !v)} style={btn} aria-label="Chat AI">
         {open ? "×" : (
-          <img
-            src={AI_AVATAR}
-            alt="AI"
-            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
-          />
+          <img src={AI_AVATAR} alt="AI" style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
         )}
       </button>
     </>
