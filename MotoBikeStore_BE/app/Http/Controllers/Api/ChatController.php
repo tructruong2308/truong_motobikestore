@@ -29,7 +29,10 @@ class ChatController extends Controller
     {
         // FE có thể gửi: [{role, content:"..."}, {role, contentParts:[{type:"text"| "image_url", ...}]}]
         $messages = $this->normalizeMessages($req->input('messages', []));
-        $messages = $this->withCatalogContext($messages, (bool)$req->input('use_db', true));
+        $messages = $this->withCatalogContext(
+            $messages,
+            (bool)$req->input('use_db', true)
+        );
 
         $client = OpenAI::client(config('services.openai.api_key'));
         $res = $client->chat()->create([
@@ -108,12 +111,12 @@ class ChatController extends Controller
         }, $messages);
     }
 
-    /* ========= BƠM CONTEXT SẢN PHẨM TỪ DB ========= */
+    /* ========= BƠM CONTEXT SẢN PHẨM TỪ DB (có URL ảnh) ========= */
     private function withCatalogContext(array $messages, bool $useDb): array
     {
         if (!$useDb) return $messages;
 
-        // chỉ lấy text của user gần nhất (nếu message là parts thì bỏ qua để tránh rườm)
+        // Chỉ lấy text của user gần nhất (nếu message là parts thì bỏ qua để tránh rườm)
         $lastUser = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
         $userText = is_string($lastUser) ? $lastUser : '';
 
@@ -123,19 +126,42 @@ class ChatController extends Controller
 
         if (empty($catalog)) return $messages;
 
+        // 1) Nhúng text catalog + URL ảnh -> khuyến khích chèn Markdown ![](url)
         $lines = array_map(function ($p) {
             $stock = is_null($p['qty']) ? 'N/A' : ($p['qty'] > 0 ? 'còn hàng' : 'hết hàng');
-            return "- #{$p['id']} | {$p['name']} | slug: {$p['slug']} | giá: {$p['price']} | {$stock} | hãng: ".($p['brand_name'] ?? 'N/A');
+            $img   = $p['thumbnail_url'] ?? '';
+            return "- #{$p['id']} | {$p['name']} | slug: {$p['slug']} | giá: {$p['price']} | {$stock}"
+                 . ($img ? " | img: {$img}" : "");
         }, $catalog);
 
         $system = [
             'role' => 'system',
             'content' =>
-                "Bạn là trợ lý bán hàng. Dựa vào CATALOG dưới đây để trả lời.\n".
-                "Nếu sp không có trong danh sách thì nói 'không có dữ liệu'. Có thể chèn ảnh Markdown ![](url) nếu phù hợp.\n\n".
+                "Bạn là trợ lý bán hàng. Khi giới thiệu sản phẩm, nếu dòng catalog có 'img:', hãy CHÈN ảnh bìa ngay sau tên bằng Markdown, ví dụ: ![](URL_ẢNH).\n".
+                "Nếu sản phẩm không có trong danh sách thì nói 'không có dữ liệu'.\n\n".
                 "CATALOG (rút gọn):\n".implode("\n", $lines)
         ];
 
+        // 2) (Tùy chọn) Đính kèm tối đa 3 ảnh thật cho model xem (Vision)
+        // Bật bằng query `attach_images=1`
+        $attach = request()->boolean('attach_images', false);
+        if ($attach) {
+            $parts = [
+                ['type' => 'text', 'text' =>
+                    "Các ảnh sau là thumbnail của sản phẩm liên quan. Hãy dùng để mô tả/so sánh nếu phù hợp."
+                ],
+            ];
+            foreach (array_slice($catalog, 0, 3) as $p) {
+                if (!empty($p['thumbnail_url'])) {
+                    $parts[] = ['type' => 'input_image', 'image_url' => $p['thumbnail_url']];
+                    $parts[] = ['type' => 'text', 'text' => "{$p['name']} — giá {$p['price']}"];
+                }
+            }
+            // system ở đầu, tiếp theo là 1 message 'user' chứa ảnh, rồi các messages còn lại
+            return [$system, ['role' => 'user', 'content' => $parts], ...$messages];
+        }
+
+        // Mặc định: chỉ thêm system + text catalog
         return [$system, ...$messages];
     }
 }
