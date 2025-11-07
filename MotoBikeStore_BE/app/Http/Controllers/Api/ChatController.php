@@ -27,16 +27,28 @@ class ChatController extends Controller
     {
         $messages = $this->normalizeMessages($req->input('messages', []));
         $messages = $this->withCatalogContext($messages, (bool)$req->input('use_db', true));
+        $messages = $this->summarizeHistory($messages, 6);
         $this->autoRememberFromMessages($messages);
 
         $client = OpenAI::client(config('services.openai.api_key'));
-        $res = $client->chat()->create([
-            'model'       => $req->input('model', 'gpt-4o-mini'),
-            'messages'    => $messages,
-            'temperature' => (float)$req->input('temperature', 0.3),
-        ]);
 
-        return response()->json(['reply' => $res->choices[0]->message->content ?? '']);
+        try {
+            $res = $client->chat()->create([
+                'model'             => $req->input('model', 'gpt-4o-mini'),
+                'messages'          => $messages,
+                'temperature'       => (float)$req->input('temperature', 0.3),
+                'max_output_tokens' => 350,
+            ]);
+            return response()->json(['reply' => $res->choices[0]->message->content ?? '']);
+        } catch (\OpenAI\Exceptions\ErrorException $e) {
+            if (str_contains(mb_strtolower($e->getMessage()), 'limit')) {
+                // Fallback nhẹ từ DB khi bị rate limit
+                $fallback = $this->quickDbAnswer($messages);
+                $msg = "Hệ thống đang quá tải. Gợi ý nhanh từ kho dữ liệu:\n".$fallback;
+                return response()->json(['reply' => $msg], 200);
+            }
+            throw $e;
+        }
     }
 
     /* ===================== STREAM (SSE) ===================== */
@@ -47,6 +59,7 @@ class ChatController extends Controller
 
         $messages = $this->normalizeMessages($raw);
         $messages = $this->withCatalogContext($messages, $useDb);
+        $messages = $this->summarizeHistory($messages, 6);
         $this->autoRememberFromMessages($messages);
 
         $client = OpenAI::client(config('services.openai.api_key'));
@@ -66,9 +79,10 @@ class ChatController extends Controller
 
             try {
                 $stream = $client->chat()->createStreamed([
-                    'model'       => $model,
-                    'messages'    => $messages,
-                    'temperature' => $temp,
+                    'model'             => $model,
+                    'messages'          => $messages,
+                    'temperature'       => $temp,
+                    'max_output_tokens' => 350,
                 ]);
 
                 foreach ($stream as $resp) {
@@ -78,9 +92,15 @@ class ChatController extends Controller
                         flush();
                     }
                 }
-            } catch (\Throwable $e) {
-                echo "data: (lỗi: {$e->getMessage()})\n\n";
-                flush();
+            } catch (\OpenAI\Exceptions\ErrorException $e) {
+                if (str_contains(mb_strtolower($e->getMessage()), 'limit')) {
+                    $fallback = $this->quickDbAnswer($messages);
+                    echo "data: ".json_encode("Hệ thống đang bận, gợi ý nhanh từ DB:\n".$fallback, JSON_UNESCAPED_UNICODE)."\n\n";
+                    flush();
+                } else {
+                    echo "data: ".json_encode("(lỗi) ".$e->getMessage(), JSON_UNESCAPED_UNICODE)."\n\n";
+                    flush();
+                }
             }
 
             echo "data: [DONE]\n\n";
@@ -232,11 +252,9 @@ class ChatController extends Controller
     /* ===================== Catalog + Memory ===================== */
     private function withCatalogContext(array $messages, bool $useDb): array
     {
-        // Tin nhắn user gần nhất
         $lastUser = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
         $userText = is_string($lastUser) ? $lastUser : '';
 
-        // 1) Parse ý định
         [$minB, $maxB] = $this->parseBudget($userText);
         [$ccMin, $ccMax] = $this->parseCC($userText);
         $brands = $this->parseBrands($userText);
@@ -244,7 +262,7 @@ class ChatController extends Controller
         $flags  = $this->parseFlags($userText);
         $compare= $this->parseCompare($userText);
 
-        // 2) Memory
+        // Memory
         [$userId, $visitorId] = $this->who(request());
         $mems = AiMemory::query()
             ->when($userId, fn($x)=>$x->where('user_id',$userId))
@@ -257,7 +275,7 @@ class ChatController extends Controller
             return "- {$m->key}: {$v}";
         })->implode("\n");
 
-        // 3) Chuẩn bị CATALOG
+        // CATALOG
         $catalog = [];
         if ($useDb) {
             if ($compare && $compare[0] && $compare[1]) {
@@ -266,16 +284,16 @@ class ChatController extends Controller
                 $catalog = array_values($rows);
             } else {
                 $filters = [
-                    'keyword'     => $userText,
-                    'brandNames'  => $brands,
-                    'categoryHints'=>$cats,
-                    'min'         => $minB,
-                    'max'         => $maxB,
-                    'onSale'      => $flags['onSale'] ?? false,
-                    'inStock'     => $flags['inStock'] ?? false,
-                    'ccMin'       => $ccMin,
-                    'ccMax'       => $ccMax,
-                    'sort'        => 'price-asc'
+                    'keyword'       => $userText,
+                    'brandNames'    => $brands,
+                    'categoryHints' => $cats,
+                    'min'           => $minB,
+                    'max'           => $maxB,
+                    'onSale'        => $flags['onSale'] ?? false,
+                    'inStock'       => $flags['inStock'] ?? false,
+                    'ccMin'         => $ccMin,
+                    'ccMax'         => $ccMax,
+                    'sort'          => 'price-asc'
                 ];
 
                 $hasStrongFilter = $filters['min']!==null || $filters['max']!==null
@@ -283,15 +301,15 @@ class ChatController extends Controller
                     || !empty($flags['onSale']) || !empty($flags['inStock']) || $ccMin!==null;
 
                 if ($hasStrongFilter) {
-                    $catalog = $this->lookup->searchAdvanced($filters, 12);
+                    $catalog = $this->lookup->searchAdvanced($filters, 6);
                 } else {
                     $catalog = $userText && mb_strlen($userText) > 1
-                        ? $this->lookup->findRelevant($userText, 12)
-                        : $this->lookup->featured(8);
+                        ? $this->lookup->findRelevant($userText, 6)
+                        : $this->lookup->featured(4);
                 }
 
                 if (empty($catalog)) {
-                    $any = \App\Models\Product::query()->latest('id')->limit(8)->get();
+                    $any = \App\Models\Product::query()->latest('id')->limit(4)->get();
                     $catalog = $any->map(function ($p) {
                         $price = (float) ($p->price_sale > 0 ? $p->price_sale : ($p->price_root ?? 0));
                         return [
@@ -306,13 +324,13 @@ class ChatController extends Controller
             }
         }
 
-        // 4) Build system
         $lines = array_map(function ($p) {
-            $stock = is_null($p['qty']) ? 'N/A' : ($p['qty'] > 0 ? 'còn hàng' : 'hết hàng');
-            $img   = $p['thumbnail_url'] ?? '';
-            return "- #{$p['id']} | {$p['name']} | slug: {$p['slug']} | giá: {$p['price']} | {$stock}"
-                 . ($img ? " | img: {$img}" : "");
-        }, $catalog ?? []);
+            $stock = is_null($p['qty']) ? 'N/A' : ($p['qty'] > 0 ? 'còn' : 'hết');
+            $name  = $this->str_limit($p['name'] ?? '', 60);
+            $slug  = $this->str_limit($p['slug'] ?? '', 40);
+            return "- #{$p['id']} | {$name} | {$slug} | {$p['price']} | {$stock}" .
+                   (!empty($p['brand_name']) ? " | {$p['brand_name']}" : "");
+        }, array_slice($catalog ?? [], 0, 6));
 
         $budgetHint = ($minB!==null || $maxB!==null)
             ? "Người dùng có ngân sách ".($minB?number_format($minB):'…')." - ".($maxB?number_format($maxB):'…')." VND.\n" : "";
@@ -320,7 +338,7 @@ class ChatController extends Controller
         $catHint    = !empty($cats)   ? ("Ưu tiên loại: ".implode(', ',$cats).".\n")   : "";
         $flagHint   = (($flags['onSale']??false) ? "Chỉ mẫu đang khuyến mãi.\n" : "")
                     . (($flags['inStock']??false) ? "Chỉ mẫu còn hàng.\n" : "");
-        $compareHint = $compare ? "Nhiệm vụ: so sánh 2 mẫu gần nhất theo dữ liệu CATALOG (giá, tồn kho, hãng, loại). Hiển thị bảng so sánh ngắn.\n" : "";
+        $compareHint = $compare ? "Nhiệm vụ: so sánh 2 mẫu gần nhất theo CATALOG.\n" : "";
 
         $system = [
             'role' => 'system',
@@ -334,16 +352,14 @@ class ChatController extends Controller
                 "CATALOG:\n".(!empty($lines) ? implode("\n",$lines) : "(trống)")
         ];
 
-        // 5) Cho model “nhìn” tối đa 2 ảnh thật (nếu FE bật attach_images=1)
+        // Vision: đính kèm tối đa 1 ảnh (nếu FE bật attach_images=1)
         if (!empty($catalog) && request()->boolean('attach_images', false)) {
-            $parts = [['type'=>'text','text'=>'Ảnh vài mẫu phù hợp:']];
-            $count = 0;
+            $parts = [['type'=>'text','text'=>'Ảnh minh họa:']];
             foreach ($catalog as $p) {
                 if (!empty($p['thumbnail_url'])) {
                     if ($safe = $this->visionPartFromUrl($p['thumbnail_url'])) {
                         $parts[] = $safe;
-                        $parts[] = ['type'=>'text','text'=>"{$p['name']} — giá {$p['price']}"];
-                        if (++$count >= 2) break;
+                        break; // chỉ 1 ảnh
                     }
                 }
             }
@@ -376,10 +392,61 @@ class ChatController extends Controller
         }
     }
 
-    /* ===================== URL ảnh -> phần vision an toàn ===================== */
+    /* ===================== Fallback DB khi rate limit ===================== */
+    private function quickDbAnswer(array $messages): string
+    {
+        $lastUser = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
+        $text = is_string($lastUser) ? $lastUser : '';
+        [$minB, $maxB] = $this->parseBudget($text);
+        $brands = $this->parseBrands($text);
+
+        $filters = [
+            'keyword' => $text,
+            'brandNames' => $brands,
+            'min' => $minB, 'max' => $maxB,
+            'sort' => 'price-asc',
+        ];
+        $rows = $this->lookup->searchAdvanced($filters, 6) ?: $this->lookup->featured(6);
+        if (empty($rows)) return "Không tìm thấy mẫu phù hợp trong kho dữ liệu.";
+
+        $lines = array_map(function($p){
+            $name = $this->str_limit($p['name'] ?? '', 60);
+            $img  = $p['thumbnail_url'] ?? '';
+            $line = "- {$name} — ".($p['price'] ?? 0)." ".(is_null($p['qty'])?'':(($p['qty']>0)?'(còn)':'(hết)'));
+            if ($img) $line .= "\n  ![](".$img.")";
+            return $line;
+        }, array_slice($rows, 0, 6));
+
+        return implode("\n", $lines);
+    }
+
+    /* ===================== Utilities ===================== */
+    private function str_limit(string $s, int $max = 350): string
+    {
+        $s = trim(preg_replace('/\s+/', ' ', $s));
+        return mb_strlen($s) > $max ? (mb_substr($s, 0, $max - 1) . '…') : $s;
+    }
+
+    private function summarizeHistory(array $messages, int $keep = 6): array
+    {
+        $sys = array_filter($messages, fn($m) => ($m['role'] ?? '') === 'system');
+        $rest= array_values(array_filter($messages, fn($m) => ($m['role'] ?? '') !== 'system'));
+        if (count($rest) <= $keep) return $messages;
+
+        $old = array_slice($rest, 0, -$keep);
+        $new = array_slice($rest, -$keep);
+
+        $join = implode(' | ', array_map(
+            fn($m) => '['.($m['role']??'').'] '.(is_string($m['content'])?$this->str_limit($m['content'],120):''),
+            $old
+        ));
+        $sys2 = ['role'=>'system','content'=>"Tóm tắt hội thoại trước đó: ".$this->str_limit($join, 800)];
+        return [...$sys, $sys2, ...$new];
+    }
+
+    // Biến URL ảnh (kể cả 127.0.0.1) thành phần vision an toàn cho OpenAI
     private function visionPartFromUrl(string $url): ?array
     {
-        // Nếu là data URL đã hợp lệ
         if (str_starts_with($url, 'data:image')) {
             return ['type' => 'image_url', 'image_url' => ['url' => $url]];
         }
@@ -387,7 +454,7 @@ class ChatController extends Controller
         $host = parse_url($url, PHP_URL_HOST) ?: '';
         $path = parse_url($url, PHP_URL_PATH) ?: '';
 
-        // URL public thực sự (không localhost) => dùng luôn
+        // Public thật sự (không localhost) => dùng thẳng
         if ($host && !in_array($host, ['127.0.0.1', 'localhost'])) {
             return ['type' => 'image_url', 'image_url' => ['url' => $url]];
         }
@@ -411,7 +478,6 @@ class ChatController extends Controller
             return ['type' => 'image_url', 'image_url' => ['url' => "data:$mime;base64,$b64"]];
         }
 
-        // Không tìm được => bỏ qua ảnh
         return null;
     }
 }
