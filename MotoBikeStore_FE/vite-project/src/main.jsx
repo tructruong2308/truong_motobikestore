@@ -15,7 +15,7 @@ import "./styles/theme.css";
 import { NotificationProvider } from "./notifications/NotificationProvider.jsx";
 import RealtimeListener from "./realtime/RealtimeListener.jsx";
 import Bell from "./notifications/Bell.jsx";
-import FloatingChat from "@/components/FloatingChat";
+import FloatingChat from "./components/FloatingChat.jsx";
 
 /* Customer pages */
 import Home from "./pages/Customers/Home";
