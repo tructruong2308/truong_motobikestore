@@ -26,8 +26,6 @@ class ChatController extends Controller
     {
         $messages = $this->normalizeMessages($req->input('messages', []));
         $messages = $this->withCatalogContext($messages, (bool)$req->input('use_db', true));
-
-        // auto-memory từ câu user gần nhất
         $this->autoRememberFromMessages($messages);
 
         $client = OpenAI::client(config('services.openai.api_key'));
@@ -40,7 +38,7 @@ class ChatController extends Controller
         return response()->json(['reply' => $res->choices[0]->message->content ?? '']);
     }
 
-    /* ===================== STREAM (SSE plain text) ===================== */
+    /* ===================== STREAM (SSE) ===================== */
     public function stream(Request $req)
     {
         $raw   = json_decode($req->query('messages', '[]'), true) ?: [];
@@ -48,8 +46,6 @@ class ChatController extends Controller
 
         $messages = $this->normalizeMessages($raw);
         $messages = $this->withCatalogContext($messages, $useDb);
-
-        // auto-memory
         $this->autoRememberFromMessages($messages);
 
         $client = OpenAI::client(config('services.openai.api_key'));
@@ -71,7 +67,7 @@ class ChatController extends Controller
             foreach ($stream as $resp) {
                 $delta = $resp->choices[0]->delta->content ?? '';
                 if ($delta !== '') {
-                    echo "data: {$delta}\n\n";   // <-- gửi plain text
+                    echo "data: {$delta}\n\n";
                     @ob_flush(); flush();
                 }
             }
@@ -89,7 +85,7 @@ class ChatController extends Controller
         $q = AiMemory::query()
             ->when($userId, fn($x)=>$x->where('user_id',$userId))
             ->when(!$userId && $visitorId, fn($x)=>$x->where('visitor_id',$visitorId))
-            ->where(function($x){ $x->whereNull('expires_at')->orWhere('expires_at','>',now()); })
+            ->where(fn($x)=>$x->whereNull('expires_at')->orWhere('expires_at','>',now()))
             ->orderByDesc('weight')->orderByDesc('updated_at');
 
         return response()->json($q->get());
@@ -141,39 +137,102 @@ class ChatController extends Controller
         return [$userId, $visitorId];
     }
 
-    /* ===================== Normalize messages ===================== */
+    /* ===================== Helpers: Parse ý định ===================== */
+    private function parseBudget(string $text): array
+    {
+        $s = mb_strtolower($text);
+        if (preg_match('/(\d{1,3})\s*[-–]\s*(\d{1,3})\s*(tr|triệu)/iu', $s, $m)) return [(int)$m[1]*1_000_000, (int)$m[2]*1_000_000];
+        if (preg_match('/(?:kho[ảa]ng|t[âa]m)\s*(\d{1,3})\s*(tr|triệu)/iu', $s, $m)) { $mid=(int)$m[1]*1_000_000; return [(int)round($mid*0.9),(int)round($mid*1.1)]; }
+        if (preg_match('/dư[ớo]i\s*(\d{1,3})\s*(tr|triệu)/iu', $s, $m)) return [0, (int)$m[1]*1_000_000];
+        if (preg_match('/\b(\d{1,3})\s*(tr|triệu)\b/iu', $s, $m)) { $mid=(int)$m[1]*1_000_000; return [(int)round($mid*0.95),(int)round($mid*1.05)]; }
+        return [null, null];
+    }
+
+    private function parseBrands(string $text): array
+    {
+        $s = mb_strtolower($text);
+        $brands = ['honda','yamaha','suzuki','piaggio','sym','vinfast','kymco'];
+        return array_values(array_filter($brands, fn($b)=>str_contains($s, $b)));
+    }
+
+    private function parseCategoryHints(string $text): array
+    {
+        $s = mb_strtolower($text);
+        $hints = [];
+        if (preg_match('/tay\s*ga|scooter/iu',$s)) $hints[]='tay ga';
+        if (preg_match('/c[ôo]n\s*tay|manual|clutch/iu',$s)) $hints[]='côn tay';
+        if (preg_match('/xe\s*số|số\s*thường/iu',$s)) $hints[]='xe số';
+        if (preg_match('/adventure|đa dụng|phượt/iu',$s)) $hints[]='adventure';
+        if (preg_match('/cào\s*cào|offroad/iu',$s)) $hints[]='cào cào';
+        return $hints;
+    }
+
+    private function parseFlags(string $text): array
+    {
+        $s = mb_strtolower($text);
+        return [
+            'onSale'  => (bool)preg_match('/gi[ảa]m|sale|khuy[êe]n m[ãa]i|ưu [đd]ãi/iu',$s),
+            'inStock' => (bool)preg_match('/c[òo]n\s*h[àa]ng|c[òo]n\s*([0-9]+)?\s*xe/iu',$s),
+        ];
+    }
+
+    private function parseCC(string $text): array
+    {
+        $s = mb_strtolower($text);
+        if (preg_match('/(\d{2,4})\s*cc/iu',$s,$m)) { $mid=(int)$m[1]; return [$mid-10, $mid+10]; }
+        return [null,null];
+    }
+
+    private function parseCompare(string $text): ?array
+    {
+        $s = mb_strtolower($text);
+        if (preg_match('/so s[áa]nh\s+(.+)\s+(?:v[ơo]i|vs|v.s\.?)\s+(.+)/iu', $s, $m)) {
+            return [trim($m[1]), trim($m[2])];
+        }
+        return null;
+    }
+
+    /* ===================== Normalize content ===================== */
     private function normalizeMessages(array $messages): array
     {
-        // hỗ trợ {role, content:"..."} và {role, contentParts:[{type:'text'|'image_url'}]}
         return array_map(function ($m) {
             if (!empty($m['contentParts']) && is_array($m['contentParts'])) {
                 $parts = [];
                 foreach ($m['contentParts'] as $p) {
                     $type = $p['type'] ?? '';
-                    if ($type === 'text') {
-                        $parts[] = ['type' => 'text', 'text' => (string)($p['text'] ?? '')];
-                    } elseif ($type === 'image_url') {
+                    if ($type === 'text') $parts[] = ['type'=>'text','text'=>(string)($p['text'] ?? '')];
+                    elseif ($type === 'image_url') {
                         $url = is_array($p['image_url']) ? ($p['image_url']['url'] ?? '') : ($p['image_url'] ?? '');
-                        if ($url) $parts[] = ['type' => 'input_image', 'image_url' => $url];
+                        if ($url) $parts[] = ['type'=>'input_image','image_url'=>$url];
                     }
                 }
-                return ['role' => $m['role'] ?? 'user', 'content' => $parts];
+                return ['role'=>$m['role'] ?? 'user','content'=>$parts];
             }
-            return ['role' => $m['role'] ?? 'user', 'content' => (string)($m['content'] ?? '')];
+            return ['role'=>$m['role'] ?? 'user','content'=>(string)($m['content'] ?? '')];
         }, $messages);
     }
 
-    /* ===================== Catalog + Memory vào prompt ===================== */
+    /* ===================== Catalog + Memory ===================== */
     private function withCatalogContext(array $messages, bool $useDb): array
     {
-        if (!$useDb) return $messages;
+        // Tin nhắn user gần nhất
+        $lastUser = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
+        $userText = is_string($lastUser) ? $lastUser : '';
 
-        // lấy memory
+        // 1) Parse ý định
+        [$minB, $maxB] = $this->parseBudget($userText);
+        [$ccMin, $ccMax] = $this->parseCC($userText);
+        $brands = $this->parseBrands($userText);
+        $cats   = $this->parseCategoryHints($userText);
+        $flags  = $this->parseFlags($userText);
+        $compare= $this->parseCompare($userText);
+
+        // 2) Memory
         [$userId, $visitorId] = $this->who(request());
         $mems = AiMemory::query()
             ->when($userId, fn($x)=>$x->where('user_id',$userId))
             ->when(!$userId && $visitorId, fn($x)=>$x->where('visitor_id',$visitorId))
-            ->where(function($x){ $x->whereNull('expires_at')->orWhere('expires_at','>',now()); })
+            ->where(fn($x)=>$x->whereNull('expires_at')->orWhere('expires_at','>',now()))
             ->orderByDesc('weight')->limit(20)->get();
 
         $memoryLines = $mems->map(function($m){
@@ -181,45 +240,89 @@ class ChatController extends Controller
             return "- {$m->key}: {$v}";
         })->implode("\n");
 
-        // text user gần nhất để tìm
-        $lastUser = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
-        $userText = is_string($lastUser) ? $lastUser : '';
+        // 3) Chuẩn bị CATALOG
+        $catalog = [];
+        if ($useDb) {
+            if ($compare && $compare[0] && $compare[1]) {
+                // so sánh 2 mẫu
+                $cmp = $this->lookup->compare2($compare[0], $compare[1]);
+                $rows = array_filter([$cmp['left'], $cmp['right']]);
+                $catalog = array_values($rows);
+            } else {
+                $filters = [
+                    'keyword'     => $userText,
+                    'brandNames'  => $brands,
+                    'categoryHints'=>$cats,
+                    'min'         => $minB,
+                    'max'         => $maxB,
+                    'onSale'      => $flags['onSale'] ?? false,
+                    'inStock'     => $flags['inStock'] ?? false,
+                    'ccMin'       => $ccMin,
+                    'ccMax'       => $ccMax,
+                    'sort'        => 'price-asc'
+                ];
 
-        $catalog = $userText && mb_strlen($userText) > 2
-            ? $this->lookup->findRelevant($userText, 12)
-            : $this->lookup->featured(8);
+                // Nếu có ngân sách/hãng/loại → searchAdvanced; nếu không → findRelevant/featured
+                $hasStrongFilter = $filters['min']!==null || $filters['max']!==null
+                    || !empty($filters['brandNames']) || !empty($filters['categoryHints'])
+                    || !empty($flags['onSale']) || !empty($flags['inStock']) || $ccMin!==null;
 
-        if (empty($catalog)) {
-            $system = [
-                'role'=>'system',
-                'content'=>
-                    "Bạn là tư vấn viên. ".($memoryLines ? "MEMORY:\n{$memoryLines}\n\n" : "").
-                    "Hiện chưa có catalog để tham chiếu; hãy hỏi thêm thông tin người dùng."
-            ];
-            return [$system, ...$messages];
+                if ($hasStrongFilter) {
+                    $catalog = $this->lookup->searchAdvanced($filters, 12);
+                } else {
+                    $catalog = $userText && mb_strlen($userText) > 1
+                        ? $this->lookup->findRelevant($userText, 12)
+                        : $this->lookup->featured(8);
+                }
+
+                // fallback bắt buộc
+                if (empty($catalog)) {
+                    $any = \App\Models\Product::query()->latest('id')->limit(8)->get();
+                    $catalog = $any->map(function ($p) {
+                        $price = (float) ($p->price_sale > 0 ? $p->price_sale : ($p->price_root ?? 0));
+                        return [
+                            'id'=>$p->id,'name'=>$p->name,'slug'=>$p->slug,'price'=>$price,
+                            'qty'=>(int)($p->qty ?? 0),
+                            'brand_name'=>optional($p->brand)->name,
+                            'category_name'=>optional($p->category)->name,
+                            'thumbnail_url'=>$p->thumbnail_url,
+                        ];
+                    })->all();
+                }
+            }
         }
 
+        // 4) Build system
         $lines = array_map(function ($p) {
             $stock = is_null($p['qty']) ? 'N/A' : ($p['qty'] > 0 ? 'còn hàng' : 'hết hàng');
             $img   = $p['thumbnail_url'] ?? '';
             return "- #{$p['id']} | {$p['name']} | slug: {$p['slug']} | giá: {$p['price']} | {$stock}"
                  . ($img ? " | img: {$img}" : "");
-        }, $catalog);
+        }, $catalog ?? []);
+
+        $budgetHint = ($minB!==null || $maxB!==null)
+            ? "Người dùng có ngân sách ".($minB?number_format($minB):'…')." - ".($maxB?number_format($maxB):'…')." VND.\n" : "";
+        $brandHint  = !empty($brands) ? ("Ưu tiên hãng: ".implode(', ',$brands).".\n") : "";
+        $catHint    = !empty($cats)   ? ("Ưu tiên loại: ".implode(', ',$cats).".\n")   : "";
+        $flagHint   = (($flags['onSale']??false) ? "Chỉ mẫu đang khuyến mãi.\n" : "")
+                    . (($flags['inStock']??false) ? "Chỉ mẫu còn hàng.\n" : "");
+
+        $compareHint = $compare ? "Nhiệm vụ: so sánh 2 mẫu gần nhất theo dữ liệu CATALOG (giá, tồn kho, hãng, loại). Hiển thị bảng so sánh ngắn.\n" : "";
 
         $system = [
             'role' => 'system',
             'content' =>
-                "Bạn là tư vấn viên bán xe máy. Luôn:\n".
-                "• Dùng MEMORY (nếu có) để cá nhân hoá.\n".
-                "• Trả lời ngắn gọn; nếu có 'img:' trong catalog, chèn ảnh ngay sau tên bằng Markdown: ![](URL).\n".
-                "• Nếu không thấy đúng mẫu, đề xuất 2–3 mẫu gần nhất và hỏi gợi mở (tầm giá/kiểu xe/hãng).\n\n".
+                "Bạn là tư vấn viên và **CHỈ** sử dụng thông tin trong CATALOG để trả lời.\n".
+                $budgetHint.$brandHint.$catHint.$flagHint.$compareHint.
+                "Quy tắc trình bày:\n".
+                "- Mỗi mẫu: tên + giá + ảnh Markdown (![](URL)) + trạng thái còn hàng.\n".
+                "- Nếu không có mẫu chính xác, đưa 3–6 mẫu gần nhất rồi hỏi gợi mở.\n\n".
                 ($memoryLines ? "MEMORY:\n{$memoryLines}\n\n" : "").
-                "CATALOG (rút gọn):\n".implode("\n", $lines)
+                "CATALOG:\n".(!empty($lines) ? implode("\n",$lines) : "(trống)")
         ];
 
-        // đính 1–2 ảnh thật cho model "nhìn" (khi attach_images=1)
-        $attach = request()->boolean('attach_images', false);
-        if ($attach) {
+        // 5) Cho model “nhìn” tối đa 2 ảnh thật (nếu FE bật attach_images=1)
+        if (!empty($catalog) && request()->boolean('attach_images', false)) {
             $parts = [['type'=>'text','text'=>'Ảnh vài mẫu phù hợp:']];
             $count = 0;
             foreach ($catalog as $p) {
@@ -235,7 +338,7 @@ class ChatController extends Controller
         return [$system, ...$messages];
     }
 
-    /* ===================== Auto-remember simple patterns ===================== */
+    /* ===================== Auto-remember vài mẫu câu ===================== */
     private function autoRememberFromMessages(array $messages): void
     {
         $last = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
@@ -243,46 +346,18 @@ class ChatController extends Controller
         $text = mb_strtolower($last);
         [$userId, $visitorId] = $this->who(request());
 
-        // tên
         if (preg_match('/tôi tên (?:là)?\s*([a-zà-ỹ\s]{2,30})/iu', $text, $m)) {
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'name'],
-                ['value'=>['text'=>trim($m[1])],'scope'=>'profile','weight'=>90]
-            );
+            AiMemory::updateOrCreate(['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'name'],
+                ['value'=>['text'=>trim($m[1])],'scope'=>'profile','weight'=>90]);
         }
-        // hãng
         if (preg_match('/(th[íi]ch|chuộng)\s+(honda|yamaha|suzuki|piaggio|sym|vinfast)/iu', $text, $m)) {
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'preferred_brand'],
-                ['value'=>['brand'=>strtoupper($m[2])],'scope'=>'preference','weight'=>85]
-            );
+            AiMemory::updateOrCreate(['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'preferred_brand'],
+                ['value'=>['brand'=>strtoupper($m[2])],'scope'=>'preference','weight'=>85]);
         }
-        // ngân sách
         if (preg_match('/(\d{2,3})\s*-\s*(\d{2,3})\s*tr/iu', $text, $m)) {
             $min=(int)$m[1]*1_000_000; $max=(int)$m[2]*1_000_000;
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'budget_range'],
-                ['value'=>['min'=>$min,'max'=>$max,'unit'=>'VND'],'scope'=>'preference','weight'=>88]
-            );
-        } elseif (preg_match('/(?:kho[ảa]ng|t[âa]m)\s*(\d{2,3})\s*tr/iu', $text, $m)) {
-            $mid=(int)$m[1]*1_000_000;
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'budget_range'],
-                ['value'=>['min'=>$mid*0.9,'max'=>$mid*1.1,'unit'=>'VND'],'scope'=>'preference','weight'=>70]
-            );
-        } elseif (preg_match('/dư[ớo]i\s*(\d{2,3})\s*tr/iu', $text, $m)) {
-            $max=(int)$m[1]*1_000_000;
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'budget_range'],
-                ['value'=>['min'=>0,'max'=>$max,'unit'=>'VND'],'scope'=>'preference','weight'=>70]
-            );
-        }
-        // kiểu xe
-        if (preg_match('/(tay ga|c[ôn] tay|xe s[oố]|\bx\s*s\b|adventure|cào cào)/iu', $text, $m)) {
-            AiMemory::updateOrCreate(
-                ['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'style'],
-                ['value'=>['text'=>trim($m[1])],'scope'=>'preference','weight'=>75]
-            );
+            AiMemory::updateOrCreate(['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'budget_range'],
+                ['value'=>['min'=>$min,'max'=>$max,'unit'=>'VND'],'scope'=>'preference','weight'=>88]);
         }
     }
 }

@@ -10,7 +10,7 @@ const getCustomer = () => {
 };
 const resolveAvatar = (u) => {
   if (!u) return null;
-  if (u.avatar_url) return u.avatar_url;               // BE đã trả URL tuyệt đối
+  if (u.avatar_url) return u.avatar_url; // BE đã trả URL tuyệt đối
   if (typeof u.avatar === "string" && u.avatar.length) {
     if (/^https?:\/\//i.test(u.avatar)) return u.avatar;
     return `${FILE_BASE}/storage/${u.avatar.replace(/^\/+/, "")}`;
@@ -26,14 +26,12 @@ const getVisitorId = () => {
   return v;
 };
 
-// Avatar AI (đổi link nếu muốn)
-const AI_AVATAR = "https://i.imgur.com/FOhT2sO.png";
+// ====== Avatar AI: dùng ảnh trong public/ ======
+const AI_AVATAR = "/image/ai.png"; // <--- đặt file vào public/ai.png
 
 export default function FloatingChat() {
   const [open, setOpen] = useState(true);
-  const [msgs, setMsgs] = useState([
-    { role: "system", content: "Bạn là trợ lý bán hàng." }
-  ]);
+  const [msgs, setMsgs] = useState([{ role: "system", content: "Bạn là trợ lý bán hàng." }]);
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
@@ -65,39 +63,52 @@ export default function FloatingChat() {
 
   // ESC để đóng
   useEffect(() => {
-    const onKey = e => e.key === "Escape" && setOpen(false);
+    const onKey = (e) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
   // typing indicator css
-  useEffect(()=>{
-    if (document.getElementById('pulse-anim')) return;
-    const s=document.createElement('style'); s.id='pulse-anim';
-    s.innerHTML='@keyframes pulse{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}';
+  useEffect(() => {
+    if (document.getElementById("pulse-anim")) return;
+    const s = document.createElement("style"); s.id = "pulse-anim";
+    s.innerHTML = "@keyframes pulse{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}";
     document.head.appendChild(s);
-  },[]);
+  }, []);
 
   // ====== styles ======
   const z = 10000;
-  const btn = { position:"fixed", right:20, bottom:20, width:56, height:56, borderRadius:"50%", border:0, cursor:"pointer",
-    background:"#0084ff", color:"#fff", fontWeight:800, fontSize:16, boxShadow:"0 10px 24px rgba(0,0,0,.2)", zIndex:z };
-  const panel = { position:"fixed", right:20, bottom:84, width:360, maxWidth:"calc(100vw - 24px)", maxHeight:"70vh",
-    display:"flex", flexDirection:"column", background:"#fff", borderRadius:16, overflow:"hidden",
-    boxShadow:"0 20px 40px rgba(0,0,0,.22)", zIndex:z };
-  const header = { display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:"1px solid #e5e7eb",
-    background:"#f8fafc", fontWeight:700 };
-  const rightCtl = { marginLeft: "auto", display:"flex", alignItems:"center", gap:10, fontSize:12, color:"#64748b" };
-  const avatar = { width:28, height:28, borderRadius:"50%", overflow:"hidden", background:"#e5f3ff", flex:"0 0 28px" };
-  const body = { padding:12, overflowY:"auto", flex:1, background:"#fff" };
-  const inputBar = { padding:10, borderTop:"1px solid #e5e7eb", display:"flex", gap:8, alignItems:"center", background:"#fff" };
-  const iconBtn = { border:"1px solid #e5e7eb", background:"#fff", borderRadius:12, padding:"8px 10px", cursor:"pointer" };
-  const sendBtn = (dis)=>({ border:0, borderRadius:12, padding:"10px 14px", background: dis ? "#9ca3af" : "#0084ff",
-    color:"#fff", fontWeight:700, cursor: dis ? "not-allowed" : "pointer" });
-  const row = (me)=>({ display:"flex", alignItems:"flex-end", gap:8, justifyContent: me ? "flex-end" : "flex-start", marginBottom:8 });
-  const bubble = (me)=>({ background: me ? "#0084ff" : "#f1f5f9", color: me ? "#fff" : "#0f172a",
-    padding:"8px 12px", borderRadius:18, maxWidth:"75%", lineHeight:1.55,
-    borderTopRightRadius: me ? 4 : 18, borderTopLeftRadius: me ? 18 : 4, whiteSpace:"pre-wrap" });
+  const btn = {
+    position: "fixed", right: 20, bottom: 20, width: 56, height: 56,
+    borderRadius: "50%", border: "3px solid #fff",
+    background: "#0084ff", color: "#fff", fontWeight: 800, fontSize: 16,
+    boxShadow: "0 10px 24px rgba(0,0,0,.2)", cursor: "pointer", zIndex: z,
+    overflow: "hidden", padding: 0
+  };
+  const panel = {
+    position: "fixed", right: 20, bottom: 84, width: 360,
+    maxWidth: "calc(100vw - 24px)", maxHeight: "70vh",
+    display: "flex", flexDirection: "column", background: "#fff",
+    borderRadius: 16, overflow: "hidden",
+    boxShadow: "0 20px 40px rgba(0,0,0,.22)", zIndex: z
+  };
+  const header = {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "10px 14px", borderBottom: "1px solid #e5e7eb",
+    background: "#f8fafc", fontWeight: 700
+  };
+  const rightCtl = { marginLeft: "auto", display: "flex", alignItems: "center", gap: 10, fontSize: 12, color: "#64748b" };
+  const avatar = { width: 28, height: 28, borderRadius: "50%", overflow: "hidden", background: "#e5f3ff", flex: "0 0 28px" };
+  const body = { padding: 12, overflowY: "auto", flex: 1, background: "#fff" };
+  const inputBar = { padding: 10, borderTop: "1px solid #e5e7eb", display: "flex", gap: 8, alignItems: "center", background: "#fff" };
+  const iconBtn = { border: "1px solid #e5e7eb", background: "#fff", borderRadius: 12, padding: "8px 10px", cursor: "pointer" };
+  const sendBtn = (dis) => ({ border: 0, borderRadius: 12, padding: "10px 14px", background: dis ? "#9ca3af" : "#0084ff", color: "#fff", fontWeight: 700, cursor: dis ? "not-allowed" : "pointer" });
+  const row = (me) => ({ display: "flex", alignItems: "flex-end", gap: 8, justifyContent: me ? "flex-end" : "flex-start", marginBottom: 8 });
+  const bubble = (me) => ({
+    background: me ? "#0084ff" : "#f1f5f9", color: me ? "#fff" : "#0f172a",
+    padding: "8px 12px", borderRadius: 18, maxWidth: "75%", lineHeight: 1.55,
+    borderTopRightRadius: me ? 4 : 18, borderTopLeftRadius: me ? 18 : 4, whiteSpace: "pre-wrap"
+  });
   const imgThumb = { width: 180, height: "auto", borderRadius: 10, display: "block" };
 
   // ====== render content: text + ảnh Markdown/link ảnh ======
@@ -108,7 +119,15 @@ export default function FloatingChat() {
     while ((m = regex.exec(text)) !== null) {
       if (m.index > last) parts.push(<span key={last}>{text.slice(last, m.index)}</span>);
       const url = m[1] || m[0];
-      parts.push(<img key={m.index} src={url} alt="" style={{ ...imgThumb, marginTop: 6 }} onError={(e)=>{e.currentTarget.style.display='none'}} />);
+      parts.push(
+        <img
+          key={m.index}
+          src={url}
+          alt=""
+          style={{ ...imgThumb, marginTop: 6 }}
+          onError={(e) => { e.currentTarget.style.display = "none"; }}
+        />
+      );
       last = regex.lastIndex;
     }
     if (last < text.length) parts.push(<span key={last}>{text.slice(last)}</span>);
@@ -119,16 +138,16 @@ export default function FloatingChat() {
   const pickImage = () => {
     const inputEl = document.createElement("input");
     inputEl.type = "file"; inputEl.accept = "image/*";
-    inputEl.onchange = ()=>{
-      const file = inputEl.files?.[0]; if(!file) return;
+    inputEl.onchange = () => {
+      const file = inputEl.files?.[0]; if (!file) return;
       const previewUrl = URL.createObjectURL(file);
-      setPendingImages(prev=>[...prev, { file, previewUrl, uploadedUrl:null }]);
+      setPendingImages((prev) => [...prev, { file, previewUrl, uploadedUrl: null }]);
     };
     inputEl.click();
   };
   const uploadOne = async (item) => {
     const fd = new FormData(); fd.append("file", item.file);
-    const r = await fetch(`${API}/chat/upload`, { method:"POST", body: fd });
+    const r = await fetch(`${API}/chat/upload`, { method: "POST", body: fd });
     const j = await r.json(); return j?.url;
   };
 
@@ -145,31 +164,31 @@ export default function FloatingChat() {
     // upload ảnh nếu có
     let uploaded = [];
     if (pendingImages.length) {
-      uploaded = await Promise.all(pendingImages.map(async (it) => {
-        try { const url = await uploadOne(it); return { ...it, uploadedUrl: url }; } catch { return it; }
-      }));
+      uploaded = await Promise.all(
+        pendingImages.map(async (it) => {
+          try { const url = await uploadOne(it); return { ...it, uploadedUrl: url }; }
+          catch { return it; }
+        })
+      );
     }
 
     // hiển thị cho user (text + markdown ảnh)
     const userShowParts = [];
     if (input.trim()) userShowParts.push(input.trim());
-    if (uploaded.length) userShowParts.push(
-      uploaded.map(u => `![](${u.uploadedUrl || u.previewUrl})`).join("\n")
-    );
+    if (uploaded.length) userShowParts.push(uploaded.map((u) => `![](${u.uploadedUrl || u.previewUrl})`).join("\n"));
     const userShowText = userShowParts.filter(Boolean).join("\n");
 
-    const newMsgs = [...msgs, { role:"user", content: userShowText }, { role:"assistant", content: "" }];
+    const newMsgs = [...msgs, { role: "user", content: userShowText }, { role: "assistant", content: "" }];
     setMsgs(newMsgs);
     setInput(""); setPendingImages([]); setStreaming(true);
 
     // gửi lên API: contentParts để Vision đọc ảnh
     const contentParts = [];
-    if (input.trim()) contentParts.push({ type:"text", text: input.trim() });
-    for (const it of uploaded) if (it.uploadedUrl)
-      contentParts.push({ type:"image_url", image_url: { url: it.uploadedUrl } });
+    if (input.trim()) contentParts.push({ type: "text", text: input.trim() });
+    for (const it of uploaded) if (it.uploadedUrl) contentParts.push({ type: "image_url", image_url: { url: it.uploadedUrl } });
 
     // bỏ system khi gửi (server sẽ tự thêm system + memory + catalog)
-    const msgsForApi = [...msgs.filter(m => m.role !== "system"), { role:"user", contentParts }];
+    const msgsForApi = [...msgs.filter((m) => m.role !== "system"), { role: "user", contentParts }];
 
     const visitorId = getVisitorId();
     const url = new URL(`${API}/chat/stream`);
@@ -184,9 +203,9 @@ export default function FloatingChat() {
     ev.onmessage = (e) => {
       if (e.data === "[DONE]") { ev.close(); setStreaming(false); return; }
       const chunk = cleanChunk(e.data);
-      setMsgs(prev => {
+      setMsgs((prev) => {
         const clone = [...prev];
-        clone[idx] = { role:"assistant", content: (clone[idx]?.content || "") + chunk };
+        clone[idx] = { role: "assistant", content: (clone[idx]?.content || "") + chunk };
         return clone;
       });
       scrollEnd();
@@ -198,9 +217,11 @@ export default function FloatingChat() {
   const clearMemory = async () => {
     try {
       const v = getVisitorId();
-      await fetch(`${API}/chat/memory/preference`, { method:'DELETE', headers:{ 'X-Visitor': v } });
+      await fetch(`${API}/chat/memory/preference`, { method: "DELETE", headers: { "X-Visitor": v } });
       alert("Đã yêu cầu xoá ghi nhớ cơ bản (preference).");
-    } catch { alert("Không xoá được memory. Kiểm tra API."); }
+    } catch {
+      alert("Không xoá được memory. Kiểm tra API.");
+    }
   };
 
   return (
@@ -209,34 +230,42 @@ export default function FloatingChat() {
         <div style={panel}>
           <div style={header}>
             <div style={avatar}>
-              <img src={AI_AVATAR} alt="AI" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+              <img src={AI_AVATAR} alt="AI" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             </div>
             Trợ lý AI
             <div style={rightCtl}>
-              <label style={{ display:"inline-flex", alignItems:"center", gap:6, cursor:"pointer" }}>
-                <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} />
+              <label style={{ display: "inline-flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
                 Nhớ tôi
               </label>
-              <button onClick={clearMemory} style={{ border:0, background:'transparent', color:'#ef4444', cursor:'pointer' }}>
+              <button onClick={clearMemory} style={{ border: 0, background: "transparent", color: "#ef4444", cursor: "pointer" }}>
                 Xoá nhớ
               </button>
             </div>
           </div>
 
           <div style={body}>
-            {msgs.filter(m => m.role !== "system").map((m, i) => {
+            {msgs.filter((m) => m.role !== "system").map((m, i) => {
               const me = m.role === "user";
               return (
                 <div key={i} style={row(me)}>
-                  {!me && <div style={avatar}><img src={AI_AVATAR} alt="AI" style={{width:"100%",height:"100%",objectFit:"cover"}} /></div>}
+                  {!me && (
+                    <div style={avatar}>
+                      <img src={AI_AVATAR} alt="AI" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                    </div>
+                  )}
                   <div style={bubble(me)}>{renderContent(m.content || "")}</div>
                   {me && (
                     <div style={avatar}>
                       {userAvatar ? (
-                        <img src={userAvatar} alt="Me" style={{width:"100%",height:"100%",objectFit:"cover"}}
-                             onError={(e)=>{e.currentTarget.style.display='none'}}/>
+                        <img
+                          src={userAvatar}
+                          alt="Me"
+                          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
                       ) : (
-                        <div style={{width:"100%",height:"100%",display:"grid",placeItems:"center",fontWeight:800}}>
+                        <div style={{ width: "100%", height: "100%", display: "grid", placeItems: "center", fontWeight: 800 }}>
                           {userInitial}
                         </div>
                       )}
@@ -247,16 +276,16 @@ export default function FloatingChat() {
             })}
 
             {streaming && (
-              <div style={{display:'flex', gap:6, margin:'6px 0 2px 34px'}}>
-                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s infinite'}}/>
-                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s .15s infinite'}}/>
-                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s .3s infinite'}}/>
+              <div style={{ display: "flex", gap: 6, margin: "6px 0 2px 34px" }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", animation: "pulse 1s infinite" }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", animation: "pulse 1s .15s infinite" }} />
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#cbd5e1", animation: "pulse 1s .3s infinite" }} />
               </div>
             )}
 
             {/* Preview ảnh chuẩn bị gửi */}
             {pendingImages.length > 0 && (
-              <div style={{ display:"flex", gap:8, flexWrap:"wrap", margin:"6px 0" }}>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", margin: "6px 0" }}>
                 {pendingImages.map((it, i) => (
                   <img key={i} src={it.previewUrl} alt="" style={imgThumb} />
                 ))}
@@ -271,17 +300,24 @@ export default function FloatingChat() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" ? ask() : null}
+              onKeyDown={(e) => (e.key === "Enter" ? ask() : null)}
               placeholder="Nhập tin nhắn..."
-              style={{ flex:1, border:"1px solid #e5e7eb", borderRadius:16, padding:"10px 12px", outline:"none" }}
+              style={{ flex: 1, border: "1px solid #e5e7eb", borderRadius: 16, padding: "10px 12px", outline: "none" }}
             />
             <button onClick={ask} disabled={streaming} style={sendBtn(streaming)}>Gửi</button>
           </div>
         </div>
       )}
 
-      <button onClick={() => setOpen(v => !v)} style={btn} aria-label="Chat AI">
-        {open ? "×" : "AI"}
+      {/* FAB: hiển thị ảnh AI khi đóng, dấu × khi đang mở */}
+      <button onClick={() => setOpen((v) => !v)} style={btn} aria-label="Chat AI">
+        {open ? "×" : (
+          <img
+            src={AI_AVATAR}
+            alt="AI"
+            style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }}
+          />
+        )}
       </button>
     </>
   );
