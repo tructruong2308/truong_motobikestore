@@ -3,12 +3,11 @@
 namespace App\Services;
 
 use App\Models\Product;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
 class ProductLookup
 {
-    /** Chuẩn hoá “vario160” -> “vario160” (bỏ mọi ký tự không a-z0-9) */
+    /** Chuẩn hoá “Vario 160” -> “vario160” (bỏ ký tự không a-z0-9) */
     private function norm(string $s): string
     {
         return preg_replace('/[^a-z0-9]+/u', '', mb_strtolower($s));
@@ -54,7 +53,7 @@ class ProductLookup
         return $this->finish($builder->limit($limit)->get());
     }
 
-    /** Lấy sp mới nhất (nếu không có từ khoá) */
+    /** Lấy sp mới nhất (gợi ý mặc định) */
     public function featured(int $limit = 8): array
     {
         return $this->finish(
@@ -83,8 +82,8 @@ class ProductLookup
     }
 
     /**
-     * Tìm nâng cao: từ 1 câu tự nhiên rút trích nhiều tiêu chí:
-     * brandNames[], categoryHints[], budget[min,max], inStock, onSale, sort, ccRange[min,max]
+     * Tìm nâng cao: rút trích nhiều tiêu chí từ câu tự nhiên:
+     * brandNames[], categoryHints[], keyword, min/max, inStock, onSale, sort, ccMin/ccMax
      */
     public function searchAdvanced(array $filters, int $limit = 12): array
     {
@@ -99,7 +98,7 @@ class ProductLookup
             });
         }
 
-        // Danh mục/loại (hint: tay ga/côn tay/…)
+        // Loại/danh mục (gợi ý: tay ga, côn tay, xe số…)
         if (!empty($filters['categoryHints'])) {
             $hints = array_map('mb_strtolower', $filters['categoryHints']);
             $b->where(function ($q) use ($hints) {
@@ -111,7 +110,7 @@ class ProductLookup
             });
         }
 
-        // Fuzzy theo tên mẫu (nếu có)
+        // Fuzzy theo tên/slug
         if (!empty($filters['keyword'])) {
             $norm = $this->norm($filters['keyword']);
             $terms = collect(preg_split('/\s+/u', mb_strtolower($filters['keyword'])))->filter()->values();
@@ -129,21 +128,45 @@ class ProductLookup
         if (isset($filters['min'])) $b->whereRaw("$expr >= ?", [$filters['min']]);
         if (isset($filters['max'])) $b->whereRaw("$expr <= ?", [$filters['max']]);
 
-        // Đang sale
-        if (!empty($filters['onSale'])) $b->where('price_sale', '>', 0);
-
-        // Còn hàng
+        // Đang sale / còn hàng
+        if (!empty($filters['onSale']))  $b->where('price_sale', '>', 0);
         if (!empty($filters['inStock'])) $b->where('qty', '>', 0);
 
-        // CC range (nếu bạn có dữ liệu cc trong name: “150”, “160”, “125”)
-        if (!empty($filters['ccMin']) || !empty($filters['ccMax'])) {
-            $ccMin = (int)($filters['ccMin'] ?? 0);
-            $ccMax = (int)($filters['ccMax'] ?? 2000);
-            // Heuristic: tìm số trong tên
-            $b->where(function ($q) use ($ccMin, $ccMax) {
-                $q->whereRaw("CAST(REGEXP_SUBSTR(name, '[0-9]{2,4}') AS UNSIGNED) BETWEEN ? AND ?", [$ccMin, $ccMax])
-                  ->orWhereRaw("CAST(REGEXP_SUBSTR(slug, '[0-9]{2,4}') AS UNSIGNED) BETWEEN ? AND ?", [$ccMin, $ccMax]);
-            });
+        // —— CC range —— (2 chế độ)
+        $ccMin = $filters['ccMin'] ?? null;
+        $ccMax = $filters['ccMax'] ?? null;
+
+        if ($ccMin !== null || $ccMax !== null) {
+            $ccMin = (int)($ccMin ?? 0);
+            $ccMax = (int)($ccMax ?? 2000);
+
+            try {
+                // MySQL 8+: lọc ngay trong SQL
+                $b->where(function ($q) use ($ccMin, $ccMax) {
+                    $q->whereRaw("CAST(REGEXP_SUBSTR(name, '[0-9]{2,4}') AS UNSIGNED) BETWEEN ? AND ?", [$ccMin, $ccMax])
+                      ->orWhereRaw("CAST(REGEXP_SUBSTR(slug,  '[0-9]{2,4}') AS UNSIGNED) BETWEEN ? AND ?", [$ccMin, $ccMax]);
+                });
+            } catch (\Throwable $e) {
+                // Fallback: tương thích MariaDB—lấy về một tập rồi lọc ở PHP
+                $raw = (clone $b)->limit(400)->get();
+                $filtered = $raw->filter(function ($p) use ($ccMin, $ccMax) {
+                    $pick = function (?string $s) {
+                        if (!$s) return null;
+                        return preg_match('/\b(\d{2,4})\b/u', $s, $m) ? (int)$m[1] : null;
+                    };
+                    $n = $pick($p->name) ?? $pick($p->slug);
+                    return $n !== null && $n >= $ccMin && $n <= $ccMax;
+                });
+
+                // Trả về sớm kết quả đã lọc theo CC
+                return $this->finish(
+                    $filtered->sortBy(function ($p) {
+                        $sale = (float)$p->price_sale;
+                        $root = (float)$p->price_root;
+                        return $sale > 0 ? $sale : $root;
+                    })->take($limit)
+                );
+            }
         }
 
         // Sắp xếp
@@ -171,7 +194,7 @@ class ProductLookup
         ];
     }
 
-    /** ——— Helpers ——— */
+    // ================= Helpers =================
 
     private function firstFuzzy(string $q): ?array
     {
@@ -202,7 +225,7 @@ class ProductLookup
                 'qty'           => (int) ($p->qty ?? 0),
                 'brand_name'    => $p->brand->name ?? null,
                 'category_name' => $p->category->name ?? null,
-                'thumbnail_url' => $p->thumbnail_url,
+                'thumbnail_url' => $p->thumbnail_url,   // accessor từ Model
             ];
         })->all();
     }
