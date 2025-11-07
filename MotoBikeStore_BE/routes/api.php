@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\CouponController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\PostImportController;
+use App\Http\Controllers\Api\ChatController;
 
 
 /* ---------- PUBLIC ---------- */
@@ -45,6 +46,9 @@ Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
 //danh
     Route::get('/coupons/claimable', [CouponController::class, 'claimable']);
 
+/* Chat with AI */
+Route::post('/chat', [ChatController::class, 'chat']);          // non-stream
+Route::get('/chat/stream', [ChatController::class, 'stream']);  // SSE stream
 
 /* ---------- CUSTOMER (Sanctum) ---------- */
 Route::middleware(['auth:sanctum'])->group(function () {
