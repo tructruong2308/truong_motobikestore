@@ -8,6 +8,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 use OpenAI;
 use App\Services\ProductLookup;
 use App\Models\AiMemory;
+use Illuminate\Support\Facades\Storage;
 
 class ChatController extends Controller
 {
@@ -53,26 +54,37 @@ class ChatController extends Controller
         $temp   = (float)$req->query('temperature', 0.3);
 
         $callback = function () use ($client, $messages, $model, $temp) {
-            @ob_end_clean();
+            @ini_set('zlib.output_compression','0');
+            @ini_set('output_buffering','off');
+            @ini_set('implicit_flush','1');
+            while (ob_get_level() > 0) { @ob_end_flush(); }
+            @ob_implicit_flush(1);
+
             header('Content-Type: text/event-stream');
             header('Cache-Control: no-cache');
             header('X-Accel-Buffering: no');
 
-            $stream = $client->chat()->createStreamed([
-                'model'       => $model,
-                'messages'    => $messages,
-                'temperature' => $temp,
-            ]);
+            try {
+                $stream = $client->chat()->createStreamed([
+                    'model'       => $model,
+                    'messages'    => $messages,
+                    'temperature' => $temp,
+                ]);
 
-            foreach ($stream as $resp) {
-                $delta = $resp->choices[0]->delta->content ?? '';
-                if ($delta !== '') {
-                    echo "data: {$delta}\n\n";
-                    @ob_flush(); flush();
+                foreach ($stream as $resp) {
+                    $delta = $resp->choices[0]->delta->content ?? '';
+                    if ($delta !== '') {
+                        echo "data: {$delta}\n\n";
+                        flush();
+                    }
                 }
+            } catch (\Throwable $e) {
+                echo "data: (lỗi: {$e->getMessage()})\n\n";
+                flush();
             }
+
             echo "data: [DONE]\n\n";
-            @ob_flush(); flush();
+            flush();
         };
 
         return new StreamedResponse($callback, 200, ['Content-Type' => 'text/event-stream']);
@@ -203,10 +215,11 @@ class ChatController extends Controller
                     if ($type === 'text') {
                         $parts[] = ['type' => 'text', 'text' => (string)($p['text'] ?? '')];
                     } elseif ($type === 'image_url') {
-                        // ✅ ĐÚNG CHUẨN v0.7
                         $url = is_array($p['image_url']) ? ($p['image_url']['url'] ?? '') : ($p['image_url'] ?? '');
                         if ($url) {
-                            $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $url]];
+                            if ($safe = $this->visionPartFromUrl($url)) {
+                                $parts[] = $safe; // đảm bảo public hoặc base64
+                            }
                         }
                     }
                 }
@@ -248,7 +261,6 @@ class ChatController extends Controller
         $catalog = [];
         if ($useDb) {
             if ($compare && $compare[0] && $compare[1]) {
-                // so sánh 2 mẫu
                 $cmp = $this->lookup->compare2($compare[0], $compare[1]);
                 $rows = array_filter([$cmp['left'], $cmp['right']]);
                 $catalog = array_values($rows);
@@ -278,7 +290,6 @@ class ChatController extends Controller
                         : $this->lookup->featured(8);
                 }
 
-                // fallback bắt buộc
                 if (empty($catalog)) {
                     $any = \App\Models\Product::query()->latest('id')->limit(8)->get();
                     $catalog = $any->map(function ($p) {
@@ -309,7 +320,6 @@ class ChatController extends Controller
         $catHint    = !empty($cats)   ? ("Ưu tiên loại: ".implode(', ',$cats).".\n")   : "";
         $flagHint   = (($flags['onSale']??false) ? "Chỉ mẫu đang khuyến mãi.\n" : "")
                     . (($flags['inStock']??false) ? "Chỉ mẫu còn hàng.\n" : "");
-
         $compareHint = $compare ? "Nhiệm vụ: so sánh 2 mẫu gần nhất theo dữ liệu CATALOG (giá, tồn kho, hãng, loại). Hiển thị bảng so sánh ngắn.\n" : "";
 
         $system = [
@@ -330,10 +340,11 @@ class ChatController extends Controller
             $count = 0;
             foreach ($catalog as $p) {
                 if (!empty($p['thumbnail_url'])) {
-                    // ✅ dùng image_url chuẩn
-                    $parts[] = ['type' => 'image_url', 'image_url' => ['url' => $p['thumbnail_url']]];
-                    $parts[] = ['type' => 'text', 'text' => "{$p['name']} — giá {$p['price']}"];
-                    if (++$count >= 2) break;
+                    if ($safe = $this->visionPartFromUrl($p['thumbnail_url'])) {
+                        $parts[] = $safe;
+                        $parts[] = ['type'=>'text','text'=>"{$p['name']} — giá {$p['price']}"];
+                        if (++$count >= 2) break;
+                    }
                 }
             }
             return [$system, ['role'=>'user','content'=>$parts], ...$messages];
@@ -342,7 +353,7 @@ class ChatController extends Controller
         return [$system, ...$messages];
     }
 
-    /* ===================== Auto-remember vài mẫu câu ===================== */
+    /* ===================== Auto-remember ===================== */
     private function autoRememberFromMessages(array $messages): void
     {
         $last = collect($messages)->reverse()->firstWhere('role','user')['content'] ?? '';
@@ -363,5 +374,44 @@ class ChatController extends Controller
             AiMemory::updateOrCreate(['user_id'=>$userId,'visitor_id'=>$visitorId,'key'=>'budget_range'],
                 ['value'=>['min'=>$min,'max'=>$max,'unit'=>'VND'],'scope'=>'preference','weight'=>88]);
         }
+    }
+
+    /* ===================== URL ảnh -> phần vision an toàn ===================== */
+    private function visionPartFromUrl(string $url): ?array
+    {
+        // Nếu là data URL đã hợp lệ
+        if (str_starts_with($url, 'data:image')) {
+            return ['type' => 'image_url', 'image_url' => ['url' => $url]];
+        }
+
+        $host = parse_url($url, PHP_URL_HOST) ?: '';
+        $path = parse_url($url, PHP_URL_PATH) ?: '';
+
+        // URL public thực sự (không localhost) => dùng luôn
+        if ($host && !in_array($host, ['127.0.0.1', 'localhost'])) {
+            return ['type' => 'image_url', 'image_url' => ['url' => $url]];
+        }
+
+        // Map /storage/... => disk public
+        if (preg_match('~^/storage/(.+)$~', $path, $m)) {
+            $rel = $m[1];
+            $abs = Storage::disk('public')->path($rel);
+            if (is_file($abs)) {
+                $mime = mime_content_type($abs) ?: 'image/png';
+                $b64  = base64_encode(file_get_contents($abs));
+                return ['type' => 'image_url', 'image_url' => ['url' => "data:$mime;base64,$b64"]];
+            }
+        }
+
+        // Thử public_path (ví dụ /uploads/...)
+        $abs2 = public_path(ltrim($path, '/'));
+        if (is_file($abs2)) {
+            $mime = mime_content_type($abs2) ?: 'image/png';
+            $b64  = base64_encode(file_get_contents($abs2));
+            return ['type' => 'image_url', 'image_url' => ['url' => "data:$mime;base64,$b64"]];
+        }
+
+        // Không tìm được => bỏ qua ảnh
+        return null;
     }
 }
