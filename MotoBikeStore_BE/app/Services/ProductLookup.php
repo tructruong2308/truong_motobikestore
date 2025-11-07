@@ -6,68 +6,78 @@ use App\Models\Product;
 
 class ProductLookup
 {
-    /**
-     * Tìm sản phẩm liên quan dựa trên nội dung câu hỏi.
-     * - match theo name/slug (+ brand nếu bạn có cột brand trong bảng Brand)
-     * - chỉ lấy sp active (status=1)
-     * - trả về mảng gọn để bơm vào prompt
-     */
     public function findRelevant(string $query, int $limit = 12): array
     {
         $q = trim($query);
         if ($q === '') return [];
 
-        // Tách từ khóa đơn giản, bỏ từ quá ngắn
         $terms = collect(preg_split('/\s+/u', mb_strtolower($q)))
             ->filter(fn($t) => mb_strlen($t) > 1)
             ->unique()
             ->values();
 
-        $builder = Product::query()->active(); // status = 1
+        $builder = Product::query()->with(['brand','category'])->active();
 
-        foreach ($terms as $t) {
-            $builder->where(function ($x) use ($t) {
-                $x->where('name', 'like', "%{$t}%")
-                  ->orWhere('slug', 'like', "%{$t}%");
+        // match name/slug
+        $builder->where(function ($x) use ($terms) {
+            foreach ($terms as $t) {
+                $x->orWhere('name','like',"%{$t}%")
+                  ->orWhere('slug','like',"%{$t}%");
+            }
+        });
+
+        // match brand/category
+        $builder->orWhereHas('brand', function ($b) use ($terms) {
+            foreach ($terms as $t) $b->orWhere('name','like',"%{$t}%");
+        });
+        $builder->orWhereHas('category', function ($c) use ($terms) {
+            foreach ($terms as $t) $c->orWhere('name','like',"%{$t}%");
+        });
+
+        // heuristic: “xe điện” -> gợi ý gần
+        if ($terms->contains(fn($t)=>str_contains($t,'điện') || $t==='ev' || str_contains($t,'electric'))) {
+            $builder->orWhere(function($x){
+                $x->where('name','like','%ga%')->orWhere('slug','like','%ga%');
             });
         }
 
-        // Lấy các trường cần thiết; appends của bạn (price_final, ...) vẫn hoạt động khi ->get()
         $rows = $builder->limit($limit)->get([
             'id','name','slug','price_root','price_sale','qty','category_id','brand_id','status','thumbnail'
-        ])->load(['brand','category']); // để appends brand_name/category_name có dữ liệu
+        ])->load(['brand','category']);
 
-        return $rows->map(fn(Product $p) => $this->toCompactArray($p))->all();
+        return $rows->map(function (Product $p) {
+            $price = (float) ($p->price_sale > 0 ? $p->price_sale : ($p->price_root ?? 0));
+            return [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'slug'          => $p->slug,
+                'price'         => $price,
+                'qty'           => (int) ($p->qty ?? 0),
+                'brand_name'    => $p->brand->name ?? null,
+                'category_name' => $p->category->name ?? null,
+                'thumbnail_url' => $p->thumbnail_url,
+            ];
+        })->all();
     }
 
-    /** Một ít sản phẩm gợi ý khi câu hỏi quá chung chung */
     public function featured(int $limit = 8): array
     {
         $rows = Product::query()->active()->latest('id')->limit($limit)->get([
             'id','name','slug','price_root','price_sale','qty','category_id','brand_id','status','thumbnail'
         ])->load(['brand','category']);
 
-        return $rows->map(fn(Product $p) => $this->toCompactArray($p))->all();
-    }
-
-    private function toCompactArray(Product $p): array
-    {
-        // Dựa theo accessor của bạn: price_final = price_sale > 0 ? price_sale : price_root
-        $price = (float) ($p->price_sale > 0 ? $p->price_sale : ($p->price_root ?? 0));
-        $stock = is_null($p->qty) ? null : (int) $p->qty;
-        return [
-            'id'            => $p->id,
-            'name'          => $p->name,
-            'slug'          => $p->slug,
-            'price'         => $price,
-            'qty'           => $stock,
-            'in_stock'      => !is_null($stock) ? $stock > 0 : null,
-            'status'        => (int) $p->status,
-            'brand_id'      => $p->brand_id,
-            'category_id'   => $p->category_id,
-            'brand_name'    => $p->brand_name,     // từ accessor của bạn
-            'category_name' => $p->category_name,  // từ accessor của bạn
-            'thumbnail_url' => $p->thumbnail_url,  // từ accessor của bạn
-        ];
+        return $rows->map(function (Product $p) {
+            $price = (float) ($p->price_sale > 0 ? $p->price_sale : ($p->price_root ?? 0));
+            return [
+                'id'            => $p->id,
+                'name'          => $p->name,
+                'slug'          => $p->slug,
+                'price'         => $price,
+                'qty'           => (int) ($p->qty ?? 0),
+                'brand_name'    => $p->brand->name ?? null,
+                'category_name' => $p->category->name ?? null,
+                'thumbnail_url' => $p->thumbnail_url,
+            ];
+        })->all();
     }
 }

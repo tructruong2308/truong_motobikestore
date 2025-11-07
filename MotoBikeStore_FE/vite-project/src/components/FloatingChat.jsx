@@ -1,9 +1,33 @@
 import { useEffect, useRef, useState } from "react";
 
 const API = import.meta.env.VITE_API_BASE || "http://127.0.0.1:8000/api";
-// Đặt link ảnh avatar AI (có thể để vào /src/assets và import):
-const AI_AVATAR = "https://i.imgur.com/FOhT2sO.png"; // đổi link ảnh bạn muốn
-const USER_AVATAR = "https://i.pravatar.cc/120?u=user"; // tuỳ chọn
+const FILE_BASE = API.replace(/\/api\/?$/, ""); // http://host:port
+
+// ====== Lấy thông tin khách hàng đăng nhập từ localStorage ======
+const getCustomer = () => {
+  try { return JSON.parse(localStorage.getItem("customer_user") || "null"); }
+  catch { return null; }
+};
+const resolveAvatar = (u) => {
+  if (!u) return null;
+  if (u.avatar_url) return u.avatar_url;               // BE đã trả URL tuyệt đối
+  if (typeof u.avatar === "string" && u.avatar.length) {
+    if (/^https?:\/\//i.test(u.avatar)) return u.avatar;
+    return `${FILE_BASE}/storage/${u.avatar.replace(/^\/+/, "")}`;
+  }
+  return null;
+};
+
+// ====== Visitor ID (ẩn danh) để gắn memory khi chưa login ======
+const VISITOR_KEY = "visitor_id";
+const getVisitorId = () => {
+  let v = localStorage.getItem(VISITOR_KEY);
+  if (!v) { v = crypto.randomUUID(); localStorage.setItem(VISITOR_KEY, v); }
+  return v;
+};
+
+// Avatar AI (đổi link nếu muốn)
+const AI_AVATAR = "https://i.imgur.com/FOhT2sO.png";
 
 export default function FloatingChat() {
   const [open, setOpen] = useState(true);
@@ -13,8 +37,48 @@ export default function FloatingChat() {
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
-  const endRef = useRef(null);
+  const [remember, setRemember] = useState(true); // Toggle "Nhớ tôi"
 
+  // User avatar từ localStorage
+  const [userObj, setUserObj] = useState(() => getCustomer());
+  const [userAvatar, setUserAvatar] = useState(() => resolveAvatar(getCustomer()));
+  const userInitial = (userObj?.name || "?").trim().charAt(0).toUpperCase();
+
+  // Scroll
+  const endRef = useRef(null);
+  const scrollEnd = () => endRef.current?.scrollIntoView({ behavior: "smooth" });
+
+  // Đồng bộ user info khi login/logout
+  useEffect(() => {
+    const sync = () => {
+      const u = getCustomer();
+      setUserObj(u);
+      setUserAvatar(resolveAvatar(u));
+    };
+    window.addEventListener("storage", sync);
+    window.addEventListener("user:refresh", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("user:refresh", sync);
+    };
+  }, []);
+
+  // ESC để đóng
+  useEffect(() => {
+    const onKey = e => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // typing indicator css
+  useEffect(()=>{
+    if (document.getElementById('pulse-anim')) return;
+    const s=document.createElement('style'); s.id='pulse-anim';
+    s.innerHTML='@keyframes pulse{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}';
+    document.head.appendChild(s);
+  },[]);
+
+  // ====== styles ======
   const z = 10000;
   const btn = { position:"fixed", right:20, bottom:20, width:56, height:56, borderRadius:"50%", border:0, cursor:"pointer",
     background:"#0084ff", color:"#fff", fontWeight:800, fontSize:16, boxShadow:"0 10px 24px rgba(0,0,0,.2)", zIndex:z };
@@ -23,8 +87,8 @@ export default function FloatingChat() {
     boxShadow:"0 20px 40px rgba(0,0,0,.22)", zIndex:z };
   const header = { display:"flex", alignItems:"center", gap:10, padding:"10px 14px", borderBottom:"1px solid #e5e7eb",
     background:"#f8fafc", fontWeight:700 };
-  const avatar = (url)=>({ width:28, height:28, borderRadius:"50%", overflow:"hidden", background:"#e5f3ff",
-    display:"grid", placeItems:"center", flex:"0 0 28px" });
+  const rightCtl = { marginLeft: "auto", display:"flex", alignItems:"center", gap:10, fontSize:12, color:"#64748b" };
+  const avatar = { width:28, height:28, borderRadius:"50%", overflow:"hidden", background:"#e5f3ff", flex:"0 0 28px" };
   const body = { padding:12, overflowY:"auto", flex:1, background:"#fff" };
   const inputBar = { padding:10, borderTop:"1px solid #e5e7eb", display:"flex", gap:8, alignItems:"center", background:"#fff" };
   const iconBtn = { border:"1px solid #e5e7eb", background:"#fff", borderRadius:12, padding:"8px 10px", cursor:"pointer" };
@@ -36,25 +100,7 @@ export default function FloatingChat() {
     borderTopRightRadius: me ? 4 : 18, borderTopLeftRadius: me ? 18 : 4, whiteSpace:"pre-wrap" });
   const imgThumb = { width: 180, height: "auto", borderRadius: 10, display: "block" };
 
-  const scrollEnd = ()=> endRef.current?.scrollIntoView({ behavior:"smooth" });
-
-  const pickImage = () => {
-    const inputEl = document.createElement("input");
-    inputEl.type = "file"; inputEl.accept = "image/*";
-    inputEl.onchange = ()=>{
-      const file = inputEl.files?.[0]; if(!file) return;
-      const previewUrl = URL.createObjectURL(file);
-      setPendingImages(prev=>[...prev, { file, previewUrl, uploadedUrl:null }]);
-    };
-    inputEl.click();
-  };
-
-  const uploadOne = async (item) => {
-    const fd = new FormData(); fd.append("file", item.file);
-    const r = await fetch(`${API}/chat/upload`, { method:"POST", body: fd });
-    const j = await r.json(); return j?.url;
-  };
-
+  // ====== render content: text + ảnh Markdown/link ảnh ======
   const renderContent = (text) => {
     const parts = [];
     const regex = /!\[[^\]]*\]\(([^)]+)\)|https?:\/\/\S+\.(?:png|jpg|jpeg|gif|webp)/gi;
@@ -69,6 +115,30 @@ export default function FloatingChat() {
     return parts.length ? parts : text;
   };
 
+  // ====== chọn & upload ảnh ======
+  const pickImage = () => {
+    const inputEl = document.createElement("input");
+    inputEl.type = "file"; inputEl.accept = "image/*";
+    inputEl.onchange = ()=>{
+      const file = inputEl.files?.[0]; if(!file) return;
+      const previewUrl = URL.createObjectURL(file);
+      setPendingImages(prev=>[...prev, { file, previewUrl, uploadedUrl:null }]);
+    };
+    inputEl.click();
+  };
+  const uploadOne = async (item) => {
+    const fd = new FormData(); fd.append("file", item.file);
+    const r = await fetch(`${API}/chat/upload`, { method:"POST", body: fd });
+    const j = await r.json(); return j?.url;
+  };
+
+  // ====== làm sạch chunk stream (nếu BE từng json_encode) ======
+  const cleanChunk = (raw) => {
+    try { const s = JSON.parse(raw); if (typeof s === "string") return s; } catch {}
+    return String(raw).replace(/\\"/g, '"').replace(/\\\\/g, "\\").replace(/\\n/g, "\n");
+  };
+
+  // ====== gửi tin ======
   const ask = async () => {
     if ((!input.trim() && pendingImages.length === 0) || streaming) return;
 
@@ -80,7 +150,7 @@ export default function FloatingChat() {
       }));
     }
 
-    // message hiển thị của người dùng (text + preview ảnh dưới dạng markdown để render)
+    // hiển thị cho user (text + markdown ảnh)
     const userShowParts = [];
     if (input.trim()) userShowParts.push(input.trim());
     if (uploaded.length) userShowParts.push(
@@ -88,34 +158,32 @@ export default function FloatingChat() {
     );
     const userShowText = userShowParts.filter(Boolean).join("\n");
 
-    // thêm vào UI: user + placeholder assistant
     const newMsgs = [...msgs, { role:"user", content: userShowText }, { role:"assistant", content: "" }];
     setMsgs(newMsgs);
     setInput(""); setPendingImages([]); setStreaming(true);
 
-    // message gửi API: contentParts (để Vision đọc ảnh)
+    // gửi lên API: contentParts để Vision đọc ảnh
     const contentParts = [];
     if (input.trim()) contentParts.push({ type:"text", text: input.trim() });
     for (const it of uploaded) if (it.uploadedUrl)
       contentParts.push({ type:"image_url", image_url: { url: it.uploadedUrl } });
 
+    // bỏ system khi gửi (server sẽ tự thêm system + memory + catalog)
     const msgsForApi = [...msgs.filter(m => m.role !== "system"), { role:"user", contentParts }];
+
+    const visitorId = getVisitorId();
     const url = new URL(`${API}/chat/stream`);
     url.searchParams.set("messages", JSON.stringify(msgsForApi));
-    url.searchParams.set("use_db", "1");
-    // bật đính ảnh sản phẩm từ DB cho model nếu muốn “nhìn” ảnh:
-    // url.searchParams.set("attach_images", "1");
+    url.searchParams.set("use_db", remember ? "1" : "0");
+    url.searchParams.set("attach_images", remember ? "1" : "0"); // cho model “nhìn” ảnh sản phẩm từ DB
+    url.searchParams.set("visitor_id", visitorId);
 
     const idx = newMsgs.length - 1;
 
     const ev = new EventSource(url.toString());
     ev.onmessage = (e) => {
       if (e.data === "[DONE]") { ev.close(); setStreaming(false); return; }
-      // ← FIX: parse chunk để loại dấu ngoặc kép nếu BE json_encode
-      let chunk = e.data;
-      try { chunk = JSON.parse(e.data); } catch {}
-      if (typeof chunk !== "string") chunk = String(chunk ?? "");
-
+      const chunk = cleanChunk(e.data);
       setMsgs(prev => {
         const clone = [...prev];
         clone[idx] = { role:"assistant", content: (clone[idx]?.content || "") + chunk };
@@ -126,21 +194,33 @@ export default function FloatingChat() {
     ev.onerror = () => { ev.close(); setStreaming(false); };
   };
 
-  useEffect(() => {
-    const onKey = e => e.key === "Escape" && setOpen(false);
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  // ====== xoá bộ nhớ cơ bản (client trigger) ======
+  const clearMemory = async () => {
+    try {
+      const v = getVisitorId();
+      await fetch(`${API}/chat/memory/preference`, { method:'DELETE', headers:{ 'X-Visitor': v } });
+      alert("Đã yêu cầu xoá ghi nhớ cơ bản (preference).");
+    } catch { alert("Không xoá được memory. Kiểm tra API."); }
+  };
 
   return (
     <>
       {open && (
         <div style={panel}>
           <div style={header}>
-            <div style={avatar(AI_AVATAR)}>
+            <div style={avatar}>
               <img src={AI_AVATAR} alt="AI" style={{width:"100%",height:"100%",objectFit:"cover"}} />
             </div>
             Trợ lý AI
+            <div style={rightCtl}>
+              <label style={{ display:"inline-flex", alignItems:"center", gap:6, cursor:"pointer" }}>
+                <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} />
+                Nhớ tôi
+              </label>
+              <button onClick={clearMemory} style={{ border:0, background:'transparent', color:'#ef4444', cursor:'pointer' }}>
+                Xoá nhớ
+              </button>
+            </div>
           </div>
 
           <div style={body}>
@@ -148,24 +228,33 @@ export default function FloatingChat() {
               const me = m.role === "user";
               return (
                 <div key={i} style={row(me)}>
-                  {!me && (
-                    <div style={avatar(AI_AVATAR)}>
-                      <img src={AI_AVATAR} alt="AI" style={{width:"100%",height:"100%",objectFit:"cover"}} />
-                    </div>
-                  )}
-                  <div style={bubble(me)}>
-                    {renderContent(m.content || "")}
-                  </div>
+                  {!me && <div style={avatar}><img src={AI_AVATAR} alt="AI" style={{width:"100%",height:"100%",objectFit:"cover"}} /></div>}
+                  <div style={bubble(me)}>{renderContent(m.content || "")}</div>
                   {me && (
-                    <div style={avatar(USER_AVATAR)}>
-                      <img src={USER_AVATAR} alt="Me" style={{width:"100%",height:"100%",objectFit:"cover"}} />
+                    <div style={avatar}>
+                      {userAvatar ? (
+                        <img src={userAvatar} alt="Me" style={{width:"100%",height:"100%",objectFit:"cover"}}
+                             onError={(e)=>{e.currentTarget.style.display='none'}}/>
+                      ) : (
+                        <div style={{width:"100%",height:"100%",display:"grid",placeItems:"center",fontWeight:800}}>
+                          {userInitial}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               );
             })}
 
-            {/* Preview ảnh chờ gửi (nếu có) */}
+            {streaming && (
+              <div style={{display:'flex', gap:6, margin:'6px 0 2px 34px'}}>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s infinite'}}/>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s .15s infinite'}}/>
+                <div style={{width:8,height:8,borderRadius:'50%',background:'#cbd5e1',animation:'pulse 1s .3s infinite'}}/>
+              </div>
+            )}
+
+            {/* Preview ảnh chuẩn bị gửi */}
             {pendingImages.length > 0 && (
               <div style={{ display:"flex", gap:8, flexWrap:"wrap", margin:"6px 0" }}>
                 {pendingImages.map((it, i) => (

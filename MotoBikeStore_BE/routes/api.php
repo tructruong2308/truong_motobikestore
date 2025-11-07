@@ -50,6 +50,10 @@ Route::post('/payments/momo/ipn',    [PaymentController::class, 'momoIpn']);
 Route::post('/chat', [ChatController::class, 'chat']);          // non-stream
 Route::get('/chat/stream', [ChatController::class, 'stream']);  // SSE stream
 Route::post('/chat/upload', [ChatController::class, 'uploadImage']); 
+// Memory
+Route::get('/chat/memory',     [ChatController::class, 'memoryIndex']);
+Route::post('/chat/memory',    [ChatController::class, 'memoryUpsert']);
+Route::delete('/chat/memory/{key}', [ChatController::class, 'memoryDelete']);
 
 /* ---------- CUSTOMER (Sanctum) ---------- */
 Route::middleware(['auth:sanctum'])->group(function () {
