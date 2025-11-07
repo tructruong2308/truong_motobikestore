@@ -154,8 +154,12 @@ export default function Cart({ cart = [], setCart }) {
   };
 
   // ======= CSS (Skin sáng)
-  const css = `
+const css = `
 :root{--line:#e5e7eb;--text:#0f172a;--muted:#64748b}
+
+/* dùng light form-controls, tránh auto dark của trình duyệt */
+.cartX{ color-scheme: light; }
+
 .cartX .tbl{ width:100%; border-collapse:separate; border-spacing:0; table-layout:fixed }
 .cartX th, .cartX td{ padding:14px 12px; border-bottom:1px dashed var(--line); vertical-align:middle }
 .cartX thead th{ font-weight:800; color:var(--text); background:#f8fafc; border-bottom:1px solid var(--line) }
@@ -164,18 +168,52 @@ export default function Cart({ cart = [], setCart }) {
 .cartX .name{ font-weight:700; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap }
 .cartX .price{ font-weight:700; text-align:right; color:var(--text) }
 .cartX .qty{ display:flex; gap:6px; align-items:center; justify-content:flex-start }
+
+/* nút +/- */
 .cartX .btn{ height:36px; padding:0 12px; border-radius:10px; border:1px solid var(--line); background:#ffffff; color:var(--text); font-weight:700; cursor:pointer; transition:transform .08s ease; box-shadow:0 1px 2px rgba(0,0,0,.04) }
 .cartX .btn:active{ transform:scale(.98) }
 .cartX .btn.ghost{ background:transparent }
 .cartX .btn.outline{ background:#ffffff }
-.cartX .qty input{ width:72px; text-align:center }
+
+/* === FIX: input số lượng luôn nền trắng, text tối, viền sáng === */
+.cartX .qty .u-input{
+  height:36px;
+  width:72px;
+  text-align:center;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#ffffff !important;
+  color:var(--text) !important;
+  outline:none;
+  box-shadow:none;
+  caret-color:var(--text);
+}
+
+/* focus ring nhẹ xanh lá */
+.cartX .qty .u-input:focus{
+  border-color:#22c55e;
+  box-shadow:0 0 0 3px rgba(34,197,94,.18);
+}
+
+/* ẩn spinner của type=number nếu có */
+.cartX .qty .u-input::-webkit-outer-spin-button,
+.cartX .qty .u-input::-webkit-inner-spin-button{ -webkit-appearance:none; margin:0 }
+.cartX .qty .u-input[type=number]{ -moz-appearance:textfield }
+
+/* chống autofill nền vàng/đen trên Chrome */
+.cartX .qty .u-input:-webkit-autofill{
+  -webkit-text-fill-color:var(--text);
+  box-shadow: inset 0 0 0px 1000px #ffffff !important;
+  transition: background-color 9999s ease-out 0s;
+}
+
 .cartX .sumBar{ position:sticky; bottom:12px; display:flex; gap:12px; align-items:center; justify-content:flex-end; padding:14px; border:1px solid var(--line); border-radius:14px; background:#ffffff; box-shadow:0 8px 30px rgba(17,24,39,.06) }
 .cartX .total{ font-weight:900; font-size:18px; color:var(--text) }
 .cartX .empty{ text-align:center; padding:28px 16px; color:var(--muted) }
 .cartX .empty .box{ display:inline-grid; gap:10px; justify-items:center; padding:18px; border:1px dashed var(--line); border-radius:14px; background:#f8fafc }
 .cartX .tag{ display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:999px; border:1px solid var(--line); background:#f1f5f9; font-size:12px; color:var(--text); font-weight:700 }
 .cartX .chk{ width:18px; height:18px; accent-color:#22c55e; cursor:pointer }
-  `;
+`;
 
   return (
     <div className="u-grid cartX" style={{ gap: 16, color: "#0f172a" }}>
