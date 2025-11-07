@@ -14,6 +14,8 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\ContactController;
 use App\Http\Controllers\PostImportController;
 use App\Http\Controllers\Api\ChatController;
+use App\Http\Controllers\Api\ChatHistoryController;
+
 
 
 /* ---------- PUBLIC ---------- */
@@ -75,6 +77,14 @@ Route::middleware(['auth:sanctum'])->group(function () {
     // Orders của khách
     Route::get ('/orders',      [OrderController::class, 'index']);
     Route::get ('/orders/{id}', [OrderController::class, 'show']);
+
+    // Chat history
+    Route::post  ('/threads',               [ChatHistoryController::class, 'createThread']);
+    Route::get   ('/threads',               [ChatHistoryController::class, 'listThreads']);
+    Route::get   ('/threads/{id}',          [ChatHistoryController::class, 'getThread']);
+    Route::patch ('/threads/{id}/title',    [ChatHistoryController::class, 'renameThread']);
+    Route::delete('/threads/{id}',          [ChatHistoryController::class, 'deleteThread']);
+    Route::post  ('/threads/{id}/messages', [ChatHistoryController::class, 'appendMessage']);
 
     
 });

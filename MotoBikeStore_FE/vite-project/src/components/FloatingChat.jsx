@@ -26,12 +26,32 @@ const getVisitorId = () => {
   return v;
 };
 
-// ====== Avatar AI: dùng ảnh trong public/ ======
-const AI_AVATAR = "/image/ai.png"; // <--- đặt file vào public/ai.png
+// ====== Lưu/khôi phục lịch sử chat (client) ======
+const LS_CHAT = "ai_chat_messages";
+const loadMsgs = () => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LS_CHAT) || "[]");
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+};
+const saveMsgs = (msgs) => {
+  // chỉ lưu user/assistant để gọn
+  const compact = msgs.filter(m => m.role === "user" || m.role === "assistant");
+  localStorage.setItem(LS_CHAT, JSON.stringify(compact));
+};
+
+// ====== Avatar AI: dùng ảnh trong public/image/ ======
+const AI_AVATAR = "/image/ai.png"; // hãy đặt file vào public/image/ai.png
 
 export default function FloatingChat() {
   const [open, setOpen] = useState(true);
-  const [msgs, setMsgs] = useState([{ role: "system", content: "Bạn là trợ lý bán hàng." }]);
+
+  // Khôi phục lịch sử client
+  const [msgs, setMsgs] = useState(() => {
+    const restored = loadMsgs();
+    return [{ role: "system", content: "Bạn là trợ lý bán hàng." }, ...restored];
+  });
+
   const [input, setInput] = useState("");
   const [streaming, setStreaming] = useState(false);
   const [pendingImages, setPendingImages] = useState([]);
@@ -75,6 +95,9 @@ export default function FloatingChat() {
     s.innerHTML = "@keyframes pulse{0%{opacity:.4}50%{opacity:1}100%{opacity:.4}}";
     document.head.appendChild(s);
   }, []);
+
+  // Lưu lịch sử chat mỗi khi thay đổi (bỏ system)
+  useEffect(() => { saveMsgs(msgs); }, [msgs]);
 
   // ====== styles ======
   const z = 10000;
