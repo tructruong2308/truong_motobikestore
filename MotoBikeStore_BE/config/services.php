@@ -35,7 +35,11 @@ return [
         ],
     ],
 
-    'openai' => ['api_key' => env('OPENAI_API_KEY')],
+    'openai' => [
+    'api_key' => env('OPENAI_API_KEY'),
+    'project' => env('OPENAI_PROJECT'),
+    'model'   => env('OPENAI_MODEL','gpt-4o-mini'),
+    ],
 
 
 ];

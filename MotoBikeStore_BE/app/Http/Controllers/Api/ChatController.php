@@ -30,8 +30,10 @@ class ChatController extends Controller
         $messages = $this->summarizeHistory($messages, 6);
         $this->autoRememberFromMessages($messages);
 
-        $client = OpenAI::client(config('services.openai.api_key'));
-
+        $client = OpenAI::factory()
+            ->withApiKey(config('services.openai.api_key'))
+            ->withProject(config('services.openai.project'))   // <-- gắn proj_...
+            ->make();
         try {
             $res = $client->chat()->create([
                 'model'             => $req->input('model', 'gpt-4o-mini'),
