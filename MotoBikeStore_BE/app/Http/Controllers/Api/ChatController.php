@@ -9,6 +9,7 @@ use OpenAI;
 use App\Services\ProductLookup;
 use App\Models\AiMemory;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Cache;
 
 class ChatController extends Controller
 {
@@ -32,15 +33,16 @@ class ChatController extends Controller
 
         $client = OpenAI::factory()
             ->withApiKey(config('services.openai.api_key'))
-            ->withProject(config('services.openai.project'))   // <-- gắn proj_...
+            ->withProject(config('services.openai.project'))   // dùng Project để tách hạn mức
             ->make();
+
         try {
-            $res = $client->chat()->create([
-                'model'             => $req->input('model', 'gpt-4o-mini'),
+            $res = $this->callOpenAI(fn() => $client->chat()->create([
+                'model'             => $req->input('model', config('services.openai.model', 'gpt-4o-mini')),
                 'messages'          => $messages,
                 'temperature'       => (float)$req->input('temperature', 0.3),
-                'max_output_tokens' => 350,
-            ]);
+                'max_output_tokens' => 220, // hạ để đỡ quota
+            ]));
             return response()->json(['reply' => $res->choices[0]->message->content ?? '']);
         } catch (\OpenAI\Exceptions\ErrorException $e) {
             if (str_contains(mb_strtolower($e->getMessage()), 'limit')) {
@@ -64,11 +66,20 @@ class ChatController extends Controller
         $messages = $this->summarizeHistory($messages, 6);
         $this->autoRememberFromMessages($messages);
 
-        $client = OpenAI::client(config('services.openai.api_key'));
-        $model  = $req->query('model', 'gpt-4o-mini');
-        $temp   = (float)$req->query('temperature', 0.3);
+        // Client có Project (tránh dùng OpenAI::client() không gắn Project)
+        $client = OpenAI::factory()
+            ->withApiKey(config('services.openai.api_key'))
+            ->withProject(config('services.openai.project'))
+            ->make();
 
-        $callback = function () use ($client, $messages, $model, $temp) {
+        $model = $req->query('model', config('services.openai.model', 'gpt-4o-mini'));
+        $temp  = (float)$req->query('temperature', 0.3);
+
+        // Khoá đồng thời 1s để giảm bắn nhiều request một lúc
+        $lockKey = 'ai:busy';
+        $gotLock = Cache::add($lockKey, 1, 1);
+
+        $callback = function () use ($client, $messages, $model, $temp, $gotLock, $lockKey) {
             @ini_set('zlib.output_compression','0');
             @ini_set('output_buffering','off');
             @ini_set('implicit_flush','1');
@@ -80,12 +91,17 @@ class ChatController extends Controller
             header('X-Accel-Buffering: no');
 
             try {
-                $stream = $client->chat()->createStreamed([
+                if (!$gotLock) {
+                    echo "data: ".json_encode("Hệ thống bận (đồng thời). Gợi ý nhanh từ DB:\n".$this->quickDbAnswer($messages), JSON_UNESCAPED_UNICODE)."\n\n";
+                    echo "data: [DONE]\n\n"; flush(); return;
+                }
+
+                $stream = $this->callOpenAI(fn() => $client->chat()->createStreamed([
                     'model'             => $model,
                     'messages'          => $messages,
                     'temperature'       => $temp,
-                    'max_output_tokens' => 350,
-                ]);
+                    'max_output_tokens' => 220,
+                ]));
 
                 foreach ($stream as $resp) {
                     $delta = $resp->choices[0]->delta->content ?? '';
@@ -95,14 +111,15 @@ class ChatController extends Controller
                     }
                 }
             } catch (\OpenAI\Exceptions\ErrorException $e) {
-                if (str_contains(mb_strtolower($e->getMessage()), 'limit')) {
+                $msg = strtolower($e->getMessage());
+                if (str_contains($msg, 'rate') || str_contains($msg, 'quota') || str_contains($msg, 'limit')) {
                     $fallback = $this->quickDbAnswer($messages);
-                    echo "data: ".json_encode("Hệ thống đang bận, gợi ý nhanh từ DB:\n".$fallback, JSON_UNESCAPED_UNICODE)."\n\n";
-                    flush();
+                    echo "data: ".json_encode("Hệ thống đang bận (rate-limit). Gợi ý nhanh từ DB:\n".$fallback, JSON_UNESCAPED_UNICODE)."\n\n";
                 } else {
                     echo "data: ".json_encode("(lỗi) ".$e->getMessage(), JSON_UNESCAPED_UNICODE)."\n\n";
-                    flush();
                 }
+            } finally {
+                Cache::forget($lockKey);
             }
 
             echo "data: [DONE]\n\n";
@@ -169,6 +186,25 @@ class ChatController extends Controller
             $visitorId = substr(hash('sha1', $req->ip().($req->userAgent()??'').config('app.key')),0,32);
         }
         return [$userId, $visitorId];
+    }
+
+    /* ===================== Helpers: Retry/Backoff ===================== */
+    private function callOpenAI(callable $fn) {
+        $delays = [0.35, 0.7, 1.4]; // giây
+        $last = null;
+        foreach ($delays as $d) {
+            try { return $fn(); }
+            catch (\OpenAI\Exceptions\ErrorException $e) {
+                $msg = strtolower($e->getMessage());
+                if (str_contains($msg, 'rate') || str_contains($msg, 'quota') || str_contains($msg, 'limit')) {
+                    usleep((int)($d * 1_000_000));
+                    $last = $e;
+                    continue;
+                }
+                throw $e;
+            }
+        }
+        throw $last ?? new \RuntimeException('OpenAI call failed');
     }
 
     /* ===================== Helpers: Parse ý định ===================== */

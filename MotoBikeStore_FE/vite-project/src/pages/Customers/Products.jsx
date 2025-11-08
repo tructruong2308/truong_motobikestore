@@ -24,6 +24,10 @@ export default function Products() {
   const [q, setQ] = useState("");
   const [sort, setSort] = useState("new");
 
+  // ====== NEW: price range state ======
+  const [minPrice, setMinPrice] = useState("");
+  const [maxPrice, setMaxPrice] = useState("");
+
   // ---------- LOAD ALL PRODUCTS ----------
   useEffect(() => {
     const ac = new AbortController();
@@ -98,12 +102,17 @@ export default function Products() {
     return () => ac.abort();
   }, []);
 
-  // ---------- URL <-> state q ----------
+  // ---------- URL -> state (q, min, max) ----------
   useEffect(() => {
     const kw = searchParams.get("q") || "";
+    const min = searchParams.get("min") || "";
+    const max = searchParams.get("max") || "";
     setQ(kw);
+    setMinPrice(min);
+    setMaxPrice(max);
   }, [searchParams]);
 
+  // ---------- state -> URL (q) ----------
   useEffect(() => {
     const t = setTimeout(() => {
       const cur = searchParams.get("q") || "";
@@ -118,6 +127,25 @@ export default function Products() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q]);
 
+  // ---------- state -> URL (min, max) ----------
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const sp = new URLSearchParams(searchParams);
+      const hasMin = minPrice !== "" && !Number.isNaN(Number(minPrice));
+      const hasMax = maxPrice !== "" && !Number.isNaN(Number(maxPrice));
+
+      if (hasMin) sp.set("min", String(minPrice));
+      else sp.delete("min");
+
+      if (hasMax) sp.set("max", String(maxPrice));
+      else sp.delete("max");
+
+      setSearchParams(sp, { replace: true });
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minPrice, maxPrice]);
+
   // ---------- ADD TO CART (fallback + lắng nghe sự kiện từ ProductCard) ----------
   const addToCartLocal = (product) => {
     const token = localStorage.getItem("token");
@@ -128,9 +156,12 @@ export default function Products() {
 
     const cart = JSON.parse(localStorage.getItem("cart") || "[]");
     const id = product?.id ?? product?.product_id;
-    const price = Number(product?.price_sale ?? product?.price ?? product?.unit_price ?? 0);
+    const price = Number(
+      product?.price_sale ?? product?.price ?? product?.unit_price ?? 0
+    );
     const name = product?.name || "Sản phẩm";
-    const thumb = product?.thumbnail_url || product?.image_url || product?.thumbnail || "";
+    const thumb =
+      product?.thumbnail_url || product?.image_url || product?.thumbnail || "";
 
     const idx = cart.findIndex((x) => x.id === id);
     if (idx > -1) {
@@ -143,7 +174,9 @@ export default function Products() {
   };
 
   useEffect(() => {
-    const onAdd = (e) => { if (e?.detail) addToCartLocal(e.detail); };
+    const onAdd = (e) => {
+      if (e?.detail) addToCartLocal(e.detail);
+    };
     window.addEventListener("add-to-cart", onAdd);
     return () => window.removeEventListener("add-to-cart", onAdd);
   }, []);
@@ -160,6 +193,21 @@ export default function Products() {
         );
 
     const priceOf = (p) => Number(p.price_sale ?? p.price ?? p.unit_price ?? 0);
+
+    // ====== NEW: apply price range if provided ======
+    const min = Number(minPrice);
+    const max = Number(maxPrice);
+    const hasMin = minPrice !== "" && !Number.isNaN(min);
+    const hasMax = maxPrice !== "" && !Number.isNaN(max);
+
+    if (hasMin || hasMax) {
+      arr = arr.filter((p) => {
+        const price = priceOf(p);
+        if (hasMin && price < min) return false;
+        if (hasMax && price > max) return false;
+        return true;
+      });
+    }
 
     switch (sort) {
       case "name_asc":
@@ -181,18 +229,35 @@ export default function Products() {
         });
     }
     return arr;
-  }, [items, q, sort]);
+  }, [items, q, sort, minPrice, maxPrice]);
+
+  // ---------- helpers (UI) ----------
+  const inputBase = {
+    background: "#ffffff",
+    border: "1px solid #e5e7eb",
+    color: "#0f172a",
+    height: 40,
+    borderRadius: 10,
+  };
+
+  const clearPrice = () => {
+    setMinPrice("");
+    setMaxPrice("");
+  };
 
   // ---------- UI ----------
   return (
-    <div className="page-wrap product-page" style={{ background: "#ffffff", color: "#0f172a" }}>
+    <div
+      className="page-wrap product-page"
+      style={{ background: "#ffffff", color: "#0f172a" }}
+    >
       {/* Toolbar */}
       <div
         className="u-card u-border"
         style={{
           padding: 12,
           display: "grid",
-          gridTemplateColumns: "1fr auto auto",
+          gridTemplateColumns: "1fr auto auto auto auto",
           gap: 10,
           alignItems: "center",
           background: "#ffffff",
@@ -201,7 +266,7 @@ export default function Products() {
           boxShadow: "0 1px 2px rgba(0,0,0,.04), 0 8px 30px rgba(17,24,39,.06)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <h2 style={{ margin: 0, color: "#0f172a" }}>Tất cả sản phẩm</h2>
           <span
             className="u-chip"
@@ -214,7 +279,7 @@ export default function Products() {
           >
             Tổng: {items.length}
           </span>
-          {q && (
+          {(q || minPrice !== "" || maxPrice !== "") && (
             <span
               className="u-chip"
               style={{
@@ -229,32 +294,45 @@ export default function Products() {
           )}
         </div>
 
+        {/* Search */}
         <input
           className="u-input"
           placeholder="🔍 Tìm sản phẩm…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          style={{
-            minWidth: 220,
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            color: "#0f172a",
-            height: 40,
-            borderRadius: 10,
-          }}
+          style={{ minWidth: 220, ...inputBase }}
         />
 
+        {/* NEW: Min price */}
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="u-input"
+          placeholder="Giá từ"
+          value={minPrice}
+          onChange={(e) => setMinPrice(e.target.value)}
+          style={{ width: 120, ...inputBase }}
+        />
+
+        {/* NEW: Max price */}
+        <input
+          type="number"
+          inputMode="numeric"
+          min={0}
+          className="u-input"
+          placeholder="Đến"
+          value={maxPrice}
+          onChange={(e) => setMaxPrice(e.target.value)}
+          style={{ width: 120, ...inputBase }}
+        />
+
+        {/* Sort */}
         <select
           className="u-input"
           value={sort}
           onChange={(e) => setSort(e.target.value)}
-          style={{
-            background: "#ffffff",
-            border: "1px solid #e5e7eb",
-            color: "#0f172a",
-            height: 40,
-            borderRadius: 10,
-          }}
+          style={{ ...inputBase }}
         >
           <option value="new">Mới nhất</option>
           <option value="name_asc">Tên A→Z</option>
@@ -262,6 +340,26 @@ export default function Products() {
           <option value="price_desc">Giá giảm dần</option>
         </select>
       </div>
+
+      {/* Quick actions under toolbar (optional) */}
+      {(minPrice !== "" || maxPrice !== "") && (
+        <div style={{ marginTop: 8 }}>
+          <button
+            onClick={clearPrice}
+            style={{
+              background: "#f1f5f9",
+              border: "1px solid #e5e7eb",
+              padding: "6px 12px",
+              borderRadius: 10,
+              cursor: "pointer",
+              fontWeight: 600,
+              color: "#0f172a",
+            }}
+          >
+            Xóa lọc giá
+          </button>
+        </div>
+      )}
 
       {/* Grid */}
       {loading && items.length === 0 ? (
@@ -313,7 +411,8 @@ export default function Products() {
               key={p.id ?? `${p.product_id}-${p.slug ?? ""}`}
               p={{
                 ...p,
-                image: p.thumbnail_url || p.thumbnail || p.image_url || PLACEHOLDER,
+                image:
+                  p.thumbnail_url || p.thumbnail || p.image_url || PLACEHOLDER,
               }}
               // onAdd={() => addToCartLocal(p)}
             />
